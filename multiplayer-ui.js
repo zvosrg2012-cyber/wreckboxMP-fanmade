@@ -54,8 +54,51 @@ function join(s){launchIntoMap(s)}
 function inGame(){root.querySelector('.locator')?.remove();root.querySelector('.chat')?.remove();loc=document.createElement('div');loc.className='locator';loc.innerHTML='<b>ИГРОКИ</b><span title="'+(nick===joined.host?'Хост':'Игрок')+'"><i class="dot" style="background:'+color(nick)+'"></i>'+(nick===joined.host?'⌂ ':'')+esc(nick)+'</span>';for(let i=1;i<Math.max(1,joined.players);i++){const n=['Bolt','Pixel','Raven'][i-1]||'Player '+(i+1);loc.insertAdjacentHTML('beforeend','<span><i class="dot" style="background:'+color(n)+'"></i>'+ (n===joined.host?'⌂ ':'')+n+'</span>')}root.appendChild(loc);if(nick===joined.host){const regen=document.createElement('button');regen.type='button';regen.className='wbmp-regen';regen.textContent='↻';regen.title='Перегенерировать карту';regen.setAttribute('aria-label','Перегенерировать карту');regen.style.cssText='font:inherit;font-size:18px;line-height:1;color:var(--ink,#f3f0e7);background:var(--room,#171a1f);border:2px solid var(--frame,#64655f);padding:5px 9px;cursor:pointer';regen.onclick=()=>{const native=[...document.querySelectorAll('button,[role=button]')].find(el=>el!==regen&&/(regenerat|reroll|перегенер|пересоздать карту)/i.test((el.innerText||'')+' '+(el.getAttribute('aria-label')||'')+' '+(el.title||'')));if(native)native.click()};loc.appendChild(regen)}chat=document.createElement('div');chat.className='chat';chat.innerHTML='<div class="head"><b>ЧАТ · '+esc(joined.code)+'</b></div><div class="msgs" id="wb-msgs"><div class="muted">Демонстрационный чат · сообщения видны только тебе.</div></div><form class="form" id="wb-chat-form"><input maxlength="180" placeholder="Сообщение…"><button>➤</button></form>';root.appendChild(chat);root.querySelector('#wb-chat-form').onsubmit=e=>{e.preventDefault();const input=chat.querySelector('input'),v=input.value.trim();if(!v)return;const line=document.createElement('div'),b=document.createElement('b');b.textContent=nick+': ';b.style.color=color(nick);line.append(b,document.createTextNode(v));const box=root.querySelector('#wb-msgs');box.appendChild(line);box.scrollTop=box.scrollHeight;input.value=''};for(const type of ['keydown','keyup','keypress'])chat.querySelector('input').addEventListener(type,e=>e.stopPropagation());chat.querySelector('input').addEventListener('pointerdown',e=>e.stopPropagation());chat.querySelector('input').addEventListener('click',e=>e.stopPropagation());window.addEventListener('keydown',onEscape)}
 function onEscape(e){if(chat&&chat.contains(document.activeElement)&&e.key!=='Escape')return;if(e.key==='Escape'&&joined){if(pauseMenu){pauseMenu.remove();pauseMenu=null}else openPause()}}
 function openPause(){pauseMenu=document.createElement('div');pauseMenu.className='menu';pauseMenu.innerHTML='<section class="menuPage menubox"><div class="title">Меню сервера</div><p>'+esc(joined.name)+' · '+esc(joined.code)+'</p><p><button id="wb-resume" style="width:100%">Продолжить</button></p><button id="wb-leave" style="width:100%">Выйти в главное меню</button></section>';root.appendChild(pauseMenu);root.querySelector('#wb-resume').onclick=()=>{pauseMenu.remove();pauseMenu=null};root.querySelector('#wb-leave').onclick=()=>{pauseMenu.remove();pauseMenu=null;joined=null;active=false;chat?.remove();loc?.remove();window.removeEventListener('keydown',onEscape);closeOverlay();const m=document.getElementById('menu');if(m){m.hidden=false;m.style.display='flex'}const canvas=document.getElementById('game');canvas?.focus()}}
+
+function installBuildColorSlider(){
+ if(document.getElementById('wbmp-build-color'))return;
+ const style=document.createElement('style');
+ style.textContent='.wbmp-build-color{position:fixed;z-index:2147480000;right:14px;bottom:14px;width:230px;padding:10px 12px;background:var(--panel,rgba(20,22,26,.94));color:var(--ink,#f3f0e7);border:2px solid var(--frame,#64655f);font:13px/1.35 var(--font-ui,system-ui,sans-serif);display:none}.wbmp-build-color label{display:flex;gap:8px;align-items:center}.wbmp-build-color input{width:100%;accent-color:var(--accent,#ffc21a)}.wbmp-build-color .wbmp-color-preview{display:inline-block;width:18px;height:18px;border:1px solid #fff8;flex:0 0 auto}';
+ document.head.appendChild(style);
+ const panel=document.createElement('div');panel.id='wbmp-build-color';panel.className='wbmp-build-color';
+ panel.innerHTML='<b>Цвет постройки</b><label><span class="wbmp-color-preview"></span><input type="range" min="0" max="360" value="45" aria-label="Оттенок цвета"></label><small class="wbmp-muted">Выбери объект, затем измени оттенок</small>';
+ document.body.appendChild(panel);
+ const range=panel.querySelector('input'),preview=panel.querySelector('.wbmp-color-preview');
+ let selectedColor='#ffd12a';
+ function applyColor(hex){
+  selectedColor=hex;preview.style.background=hex;
+  let applied=false;
+  const candidates=['selectedObject','selectedMesh','currentObject','activeObject','placingObject','buildingObject','selectedEntity','currentEntity','objectSelected'];
+  for(const key of candidates){
+   let obj;try{obj=window[key]}catch(_){}
+   if(!obj)continue;
+   const targets=[obj,obj.mesh,obj.object,obj.model,obj.root].filter(Boolean);
+   for(const target of targets){
+    const mats=Array.isArray(target.material)?target.material:[target.material];
+    for(const mat of mats){try{if(mat&&mat.color){if(typeof mat.color.set==='function')mat.color.set(hex);else mat.color=hex;if(mat.needsUpdate!==undefined)mat.needsUpdate=true;applied=true}}catch(_){}}
+    try{if(target.setColor){target.setColor(hex);applied=true}}catch(_){}
+    try{if(target.setTint){target.setTint(hex);applied=true}}catch(_){}
+   }
+  }
+  const native=document.querySelectorAll('input[type="color"]:not(#wbmp-build-color input)');
+  for(const input of native){try{input.value=hex;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));applied=true}catch(_){}}
+  panel.dataset.applied=applied?'yes':'no';
+ }
+ range.addEventListener('input',()=>{const hue=+range.value;const hex=hslToHex(hue,100,58);applyColor(hex)});
+ function hslToHex(h,s,l){s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));return '#'+[f(0),f(8),f(4)].map(v=>Math.round(255*v).toString(16).padStart(2,'0')).join('')}
+ function isBuildMenuVisible(){
+  const nodes=[...document.querySelectorAll('body *')].filter(el=>el.children.length<5&&el.getClientRects().length);
+  return nodes.some(el=>{const t=(el.innerText||el.getAttribute('aria-label')||'').trim().toLowerCase();return t&&t.length<180&&/(строительств|материал|build mode|construction|materials)/i.test(t)&&!panel.contains(el)});
+ }
+ const update=()=>{panel.style.display=isBuildMenuVisible()?'block':'none'};
+ new MutationObserver(update).observe(document.body,{childList:true,subtree:true,attributes:true});
+ document.addEventListener('click',e=>{if(panel.contains(e.target))return;const t=((e.target.innerText||'')+' '+(e.target.getAttribute?.('aria-label')||'')).toLowerCase();if(/стро|материал|build|construct/i.test(t))setTimeout(update,50)},true);
+ update();
+}
+
 function installNickSetting(){const settings=document.getElementById('mp_settings');if(!settings||document.getElementById('wbmp-nickname-setting'))return;const box=document.createElement('label');box.className='wbmp-nick-setting';box.innerHTML='<b>Никнейм в мультиплеере</b><input id="wbmp-nickname-setting" class="field" maxlength="20" placeholder="Введи никнейм"><span class="muted">Имя отображается в списке игроков и чате.</span>';settings.appendChild(box);const input=box.querySelector('input');input.value=nick;input.addEventListener('change',()=>saveNick(input.value));input.addEventListener('keydown',e=>{if(e.key==='Enter'){saveNick(input.value);input.blur()}})}
 function onPlay(e){if(launching||active||root.querySelector('.overlay'))return;const el=e.target.closest('button,[role=button],a');if(!el)return;if(el.id==='mPlay'||/^(играть|play)$/i.test((el.innerText||'').trim())){e.preventDefault();e.stopImmediatePropagation();if(nick)serverScreen();else nickScreen()}}
 document.addEventListener('click',onPlay,true);
 installNickSetting();
+installBuildColorSlider();
 })();
