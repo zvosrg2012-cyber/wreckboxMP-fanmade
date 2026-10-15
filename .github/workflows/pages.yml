@@ -1,0 +1,45 @@
+name: Publish browser build
+on:
+  push:
+    branches: [main, web-playable]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare web build
+        run: |
+          mkdir -p dist
+          cp -R index.html assets inventory.json dist/ 2>/dev/null || true
+          cp player-list.js dist/player-list.js
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("dist/index.html")
+          html = p.read_text(encoding="utf-8")
+          tag = '<script src="./player-list.js"></script>'
+          if tag not in html:
+              pos = html.lower().rfind("</body>")
+              html = html[:pos] + tag + html[pos:] if pos >= 0 else html + tag
+          p.write_text(html, encoding="utf-8")
+          PY
+          touch dist/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
