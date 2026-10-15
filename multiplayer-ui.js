@@ -2,7 +2,7 @@
 const maps=['Город','Пригород','Мегаполис','Промзона','Порт','Деревня под вулканом'];
 const colors=['#ff6258','#ffc21a','#58c7ff','#7ee081','#c49bff','#ff8fca','#ff9e42','#4dd6c8'];
 const css=[
-'body:not(.wbmp-creating) .room.map{display:none!important}',
+'body .room.map{display:none!important}',
 '.wbmp{font:14px/1.35 var(--font-ui,system-ui,sans-serif);color:var(--ink,#f3f0e7)}',
 '.wbmp button,.wbmp input,.wbmp select{font:inherit}',
 '.wbmp button{cursor:pointer;color:var(--ink,#f3f0e7);background:var(--room,#171a1f);border:2px solid var(--frame,#64655f);padding:9px 12px;box-shadow:inset 0 0 0 1px #0008}',
@@ -27,7 +27,7 @@ const css=[
 '.wbmp .menubox{width:min(360px,95vw)}',
 '.wbmp .mapchoice{display:flex;gap:8px;align-items:center;margin:12px 0}',
 '.wbmp .mapchoice select{flex:1;min-width:0;background:var(--room2,#101216);color:var(--ink,#f3f0e7);border:1px solid var(--frame,#64655f);padding:10px}',
-'#mp_settings .wbmp-nick-setting{display:flex;flex-direction:column;gap:7px;margin-top:18px;padding-top:12px;border-top:1px solid var(--line,rgba(255,255,255,.1))}'
+'#mp_settings .wbmp-nick-setting{display:flex;flex-direction:column;gap:7px;margin-top:18px;padding-top:12px;border-top:1px solid var(--line,rgba(255,255,255,.1))}#mp_settings .wbmp-nick-setting .field{width:100%;background:var(--room2,#101216);color:var(--ink,#f3f0e7);border:1px solid var(--line,rgba(255,255,255,.15));padding:10px}'
 ].join('');
 const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
 const root=document.createElement('div');root.className='wbmp';document.body.appendChild(root);
