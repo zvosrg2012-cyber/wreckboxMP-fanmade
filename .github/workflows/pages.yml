@@ -1,7 +1,7 @@
 name: Publish browser build
 on:
   push:
-    branches: [web-playable]
+    branches: [main, web-playable]
   workflow_dispatch:
 permissions:
   contents: read
