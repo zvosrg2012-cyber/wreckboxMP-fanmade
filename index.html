@@ -922,7 +922,7 @@ const SAMPLES={traffic:{loop:[.25,18.25],b64:"//NQxAAQwGqgH0wIAE25JfwJiOrYJAkCQJ
       if(el===toggle||panel.contains(el))continue;
       const t=((el.innerText||'')+' '+(el.getAttribute('aria-label')||'')+' '+(el.title||'')).trim().toLocaleLowerCase('ru-RU');
       if(!t)continue;
-      if(/замедл.*врем|врем.*замедл|slow.?motion|time.?slow|пауза|pause|гравитац|gravity|убрать обломки|очистить обломки|очистка обломков|clear debris|remove debris/.test(t)){
+      if(/замедл.*врем|врем.*замедл|slow.?motion|time.?slow|пауза|pause|гравитац|gravity|убрать обломки|очистить обломки|очистка обломков|clear debris|гравит|gravity|облом|debris/.test(t)){
         el.style.setProperty('display','none','important');
         el.setAttribute('data-wb-hidden-control','true');
       }
