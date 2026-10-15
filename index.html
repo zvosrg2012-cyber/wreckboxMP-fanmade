@@ -872,19 +872,31 @@ const SAMPLES={traffic:{loop:[.25,18.25],b64:"//NQxAAQwGqgH0wIAE25JfwJiOrYJAkCQJ
   if(window.__wbPlayerUiInstalled)return;
   window.__wbPlayerUiInstalled=true;
   const palette=['#ff6258','#ffc21a','#58c7ff','#7ee081','#c49bff','#ff8fca','#f2f2ed','#ff9e42'];
+  const norm=v=>String(v??'').trim();
   function colorForNick(nick){
-    const s=String(nick||'Игрок').trim().toLocaleLowerCase('ru-RU');
-    let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;
-    return palette[h%palette.length];
+    const s=norm(nick).toLocaleLowerCase('ru-RU');
+    let sum=0;for(let i=0;i<s.length;i++)sum=(sum+s.charCodeAt(i))>>>0;
+    return palette[sum%palette.length];
   }
   function getNick(){
     for(const k of Object.keys(localStorage)){
       if(/nick|username|player.?name/i.test(k)){
-        const v=localStorage.getItem(k);if(v&&v.trim()&&v.length<40)return v.trim();
+        const v=norm(localStorage.getItem(k));if(v&&v.length<40)return v;
       }
     }
     const input=[...document.querySelectorAll('input')].find(x=>/ник|nickname|имя игрока|player name/i.test((x.placeholder||'')+' '+(x.getAttribute('aria-label')||'')));
-    return input&&input.value.trim()?input.value.trim():'Игрок';
+    return input&&norm(input.value)?norm(input.value):'Игрок';
+  }
+  function getPlayers(){
+    const candidates=[];
+    const add=(v)=>{if(!Array.isArray(v))return;for(const p of v){if(typeof p==='string'){if(norm(p))candidates.push({name:norm(p)});continue;}if(!p||typeof p!=='object')continue;const name=norm(p.username||p.nickname||p.nick||p.playerName||p.name);if(name)candidates.push({name,icon:p.icon||p.avatar||p.emoji||p.image||'',color:p.color||p.colour||''});}};
+    for(const [k,v] of Object.entries(window)){if(/players|roomUsers|lobbyUsers|connectedUsers/i.test(k))try{add(v)}catch(_){}}
+    for(const k of ['players','roomPlayers','lobbyPlayers','connectedPlayers','users','roomUsers']){
+      try{add(window[k]);if(window[k]&&typeof window[k]==='object')add(window[k].players)}catch(_){}
+    }
+    const unique=new Map();for(const p of candidates)unique.set(p.name.toLocaleLowerCase('ru-RU'),p);
+    if(!unique.size){const name=getNick();unique.set(name.toLocaleLowerCase('ru-RU'),{name});}
+    return [...unique.values()];
   }
   function getLobbyCode(){
     let code=localStorage.getItem('wb_lobby_code');
@@ -899,13 +911,18 @@ const SAMPLES={traffic:{loop:[.25,18.25],b64:"//NQxAAQwGqgH0wIAE25JfwJiOrYJAkCQJ
   if(!toolbar)return;
   toolbar.appendChild(toggle);document.body.appendChild(panel);
   function render(){
-    const nick=getNick(),color=colorForNick(nick),list=panel.querySelector('.wb-list');
-    list.replaceChildren();
-    const row=document.createElement('div');row.className='wb-player';row.style.setProperty('--player-color',color);
-    const avatar=document.createElement('span');avatar.className='wb-avatar';avatar.setAttribute('aria-hidden','true');avatar.textContent='♟';
-    const name=document.createElement('span');name.className='wb-name';name.textContent=nick;
-    const swatch=document.createElement('span');swatch.className='wb-color';swatch.title='Цвет игрока';swatch.setAttribute('aria-label','Цвет игрока');
-    row.append(avatar,name,swatch);list.appendChild(row);
+    const list=panel.querySelector('.wb-list');list.replaceChildren();
+    for(const player of getPlayers()){
+      const color=colorForNick(player.name);
+      const row=document.createElement('div');row.className='wb-player';row.style.setProperty('--player-color',color);
+      const avatar=document.createElement('span');avatar.className='wb-avatar';avatar.setAttribute('aria-hidden','true');
+      const iconValue=norm(player.icon);
+      if(iconValue&&/^https?:\/\//i.test(iconValue)){const img=document.createElement('img');img.src=iconValue;img.alt='';img.style.cssText='width:100%;height:100%;object-fit:cover';avatar.appendChild(img);}
+      else avatar.textContent=iconValue&&iconValue.length<=8?iconValue:'♟';
+      const name=document.createElement('span');name.className='wb-name';name.textContent=player.name;
+      const swatch=document.createElement('span');swatch.className='wb-color';swatch.title='';swatch.setAttribute('aria-label','');
+      row.append(avatar,name,swatch);list.appendChild(row);
+    }
     panel.querySelector('.wb-code').textContent=getLobbyCode();
   }
   function setOpen(open){panel.hidden=!open;toggle.setAttribute('aria-expanded',String(open));if(open)render();}
@@ -913,16 +930,16 @@ const SAMPLES={traffic:{loop:[.25,18.25],b64:"//NQxAAQwGqgH0wIAE25JfwJiOrYJAkCQJ
   panel.querySelector('.wb-close').addEventListener('click',()=>setOpen(false));
   panel.querySelector('.wb-copy').addEventListener('click',async()=>{
     const code=panel.querySelector('.wb-code').textContent,btn=panel.querySelector('.wb-copy');
-    try{await navigator.clipboard.writeText(code);btn.textContent='Готово';}
-    catch(e){const ta=document.createElement('textarea');ta.value=code;ta.style.position='fixed';ta.style.opacity='0';document.body.append(ta);ta.select();try{document.execCommand('copy');btn.textContent='Готово';}catch(_){btn.textContent='Ошибка';}ta.remove();}
+    try{await navigator.clipboard.writeText(code);btn.textContent='Скопировано';}
+    catch(e){const ta=document.createElement('textarea');ta.value=code;ta.style.position='fixed';ta.style.opacity='0';document.body.append(ta);ta.select();try{document.execCommand('copy');btn.textContent='Скопировано';}catch(_){btn.textContent='Не удалось';}ta.remove();}
     setTimeout(()=>btn.textContent='Копировать',1300);
   });
   function hideUnwantedControls(){
-    for(const el of document.querySelectorAll('#ctrl button,[role="button"],button')){
+    for(const el of document.querySelectorAll('#ctrl button,button,[role="button"]')){
       if(el===toggle||panel.contains(el))continue;
       const t=((el.innerText||'')+' '+(el.getAttribute('aria-label')||'')+' '+(el.title||'')).trim().toLocaleLowerCase('ru-RU');
       if(!t)continue;
-      if(/замедл.*врем|врем.*замедл|slow.?motion|time.?slow|пауза|pause|гравитац|gravity|убрать обломки|очистить обломки|очистка обломков|clear debris|гравит|gravity|облом|debris/.test(t)){
+      if(/замедл.*врем|врем.*замедл|slow.?motion|time.?slow|пауза|pause|гравитац|gravity|измен.*гравит|убрать обломки|очистить обломки|очистка обломков|clear debris|очист.*мусор/.test(t)){
         el.style.setProperty('display','none','important');
         el.setAttribute('data-wb-hidden-control','true');
       }
