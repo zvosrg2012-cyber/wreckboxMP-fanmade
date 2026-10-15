@@ -16,6 +16,14 @@
     }
     return [];
   };
+  const removeUnwantedControls = () => {
+    const unwanted = /(gravity|гравитац|debris|обломк|time.?slow|slow.?motion|замедлен|pause|пауза)/i;
+    document.querySelectorAll("button,[role=button]").forEach(el => {
+      if (el === openButton || panel.contains(el)) return;
+      const label = [el.innerText, el.getAttribute("aria-label"), el.getAttribute("title")].filter(Boolean).join(" ");
+      if (unwanted.test(label)) el.style.setProperty("display", "none", "important");
+    });
+  };
   const buttonStyle = "font:600 14px Arial,sans-serif;color:#f1eee6;background:#292b2b;border:2px solid #74766f;border-radius:3px;padding:10px 14px;box-shadow:inset 0 0 0 2px #171818;cursor:pointer;letter-spacing:.4px";
   const openButton = document.createElement("button");
   openButton.type = "button";
@@ -28,6 +36,8 @@
   panel.style.cssText = "display:none;position:fixed;right:18px;bottom:68px;z-index:2147483000;width:min(320px,calc(100vw - 36px));max-height:60vh;overflow:auto;background:#252727;color:#f1eee6;border:3px solid #74766f;box-shadow:inset 0 0 0 3px #171818,0 8px 28px #0009;padding:14px;font:14px Arial,sans-serif";
   panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><strong style="font-size:16px;letter-spacing:1px">ИГРОКИ</strong><button type="button" data-close style="' + buttonStyle + ';padding:4px 9px">✕</button></div><div data-list></div><div style="display:flex;align-items:center;gap:8px;border-top:1px solid #62645f;margin-top:12px;padding-top:12px"><span style="color:#c5c7c0">ЛОББИ</span><strong data-code style="font-size:18px;letter-spacing:2px"></strong><button type="button" data-copy style="' + buttonStyle + ';margin-left:auto;padding:7px 10px">Копировать</button></div>';
   document.body.appendChild(panel);
+  removeUnwantedControls();
+  new MutationObserver(removeUnwantedControls).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-label", "title"] });
   let lobbyCode = String(Math.floor(10000 + Math.random() * 90000));
   panel.querySelector("[data-code]").textContent = lobbyCode;
   const render = () => {
