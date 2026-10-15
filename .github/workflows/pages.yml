@@ -1,14 +1,12 @@
-name: Publish browser build
+name: Build browser game with player list
 on:
   push:
-    branches: [main, web-playable]
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
-  pages: write
-  id-token: write
 concurrency:
-  group: pages
+  group: browser-build
   cancel-in-progress: true
 jobs:
   build:
@@ -31,15 +29,10 @@ jobs:
           p.write_text(html, encoding="utf-8")
           PY
           touch dist/.nojekyll
-      - uses: actions/upload-pages-artifact@v3
+      - name: Upload playable browser build
+        uses: actions/upload-artifact@v4
         with:
-          path: dist
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          name: wreckbox-web-build
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
