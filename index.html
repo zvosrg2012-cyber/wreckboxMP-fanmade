@@ -851,94 +851,85 @@ const SAMPLES={traffic:{loop:[.25,18.25],b64:"//NQxAAQwGqgH0wIAE25JfwJiOrYJAkCQJ
 </script>
 
 <style id="wb-player-ui-style">
-#wbPlayersToggle{position:fixed;z-index:99990;right:16px;top:16px;display:flex;align-items:center;gap:8px;padding:10px 14px;background:linear-gradient(#292b2f,#17191d);border:1px solid rgba(255,194,26,.65);border-bottom:3px solid #ffc21a;color:#f3f0e7;font:700 13px system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;box-shadow:0 5px 18px #0008;cursor:pointer}
-#wbPlayersToggle:hover{filter:brightness(1.15)}
-#wbPlayersPanel{position:fixed;z-index:99991;right:16px;top:62px;width:min(320px,calc(100vw - 32px));padding:0;background:rgba(17,19,23,.97);color:#f3f0e7;border:1px solid #555953;box-shadow:0 12px 40px #000a;font:14px/1.35 system-ui,sans-serif}
+#wbPlayersToggle.ib{width:auto;min-width:44px;padding:0 10px;gap:7px}
+#wbPlayersPanel{position:fixed;z-index:99991;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 104px);width:min(320px,calc(100vw - 24px));max-height:min(60vh,440px);display:flex;flex-direction:column;background:var(--panel,rgba(20,22,26,.96));color:var(--ink,#f3f0e7);border:5px solid var(--tx-concrete,var(--frame,#45484b));box-shadow:0 10px 32px #000a;font:14px/1.35 system-ui,sans-serif}
 #wbPlayersPanel[hidden]{display:none}
-#wbPlayersPanel .wb-head{display:flex;justify-content:space-between;align-items:center;padding:13px 14px;border-bottom:1px solid #ffffff20;background:linear-gradient(90deg,#292b2f,#17191d);font-weight:800;letter-spacing:.06em;text-transform:uppercase}
-#wbPlayersPanel .wb-close{font-size:22px;line-height:1;padding:0 3px;color:#bdbdb7}
-#wbPlayersPanel .wb-list{padding:10px;max-height:40vh;overflow:auto}
-#wbPlayersPanel .wb-player{display:flex;align-items:center;gap:10px;padding:9px 8px;background:#ffffff08;border:1px solid #ffffff12;margin-bottom:6px}
-#wbPlayersPanel .wb-avatar{width:32px;height:32px;flex:none;display:grid;place-items:center;font-weight:900;color:#111;border:2px solid #ffffff55;text-transform:uppercase}
-#wbPlayersPanel .wb-name{font-weight:700;overflow-wrap:anywhere}
-#wbPlayersPanel .wb-sub{font-size:11px;color:#a9aaa6;margin-top:2px}
-#wbPlayersPanel .wb-lobby{padding:12px 14px;border-top:1px solid #ffffff20;background:#0d0f12}
-#wbPlayersPanel .wb-lobby-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#a9aaa6;margin-bottom:7px}
+#wbPlayersPanel .wb-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:rgba(255,255,255,.04);border-bottom:2px solid var(--line,rgba(255,255,255,.1));font-weight:800;letter-spacing:.04em}
+#wbPlayersPanel .wb-close{font-size:22px;line-height:1;padding:0 4px;color:var(--ink,#f3f0e7)}
+#wbPlayersPanel .wb-list{padding:10px;overflow:auto;flex:1}
+#wbPlayersPanel .wb-player{display:flex;align-items:center;gap:10px;padding:8px;background:rgba(255,255,255,.035);border:1px solid var(--line,rgba(255,255,255,.1))}
+#wbPlayersPanel .wb-avatar{width:34px;height:34px;flex:none;display:grid;place-items:center;font-size:19px;background:rgba(255,255,255,.06);border:2px solid var(--player-color);color:var(--player-color)}
+#wbPlayersPanel .wb-name{font-weight:700;overflow-wrap:anywhere;flex:1}
+#wbPlayersPanel .wb-color{width:18px;height:18px;background:var(--player-color);border:1px solid #ffffff80;flex:none}
+#wbPlayersPanel .wb-lobby{padding:10px;border-top:2px solid var(--line,rgba(255,255,255,.1));background:rgba(0,0,0,.16)}
 #wbPlayersPanel .wb-code-row{display:flex;align-items:center;gap:8px}
-#wbPlayersPanel .wb-code{font:800 22px ui-monospace,monospace;letter-spacing:.2em;color:#ffc21a;flex:1}
-#wbPlayersPanel .wb-copy{padding:8px 10px;background:#ffc21a;color:#1c1600;font-weight:900;border:0;cursor:pointer}
-#wbPlayersPanel .wb-note{font-size:10px;color:#858780;margin-top:7px}
-@media(max-width:600px){#wbPlayersToggle{top:auto;bottom:90px;right:10px;padding:9px 11px}#wbPlayersPanel{top:auto;bottom:138px;right:10px}}
+#wbPlayersPanel .wb-code{font:800 21px ui-monospace,monospace;letter-spacing:.16em;color:var(--accent,#ffc21a);flex:1}
+#wbPlayersPanel .wb-copy.ib{width:auto;min-width:44px;padding:0 10px}
+@media(max-width:600px){#wbPlayersPanel{right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 100px);width:min(320px,calc(100vw - 16px))}}
 </style>
 <script id="wb-player-ui">
 (function(){
-  if (window.__wbPlayerUiInstalled) return;
-  window.__wbPlayerUiInstalled = true;
-  const palette = ['#ff6258','#ffc21a','#58c7ff','#7ee081','#c49bff','#ff8fca','#f2f2ed','#ff9e42'];
+  if(window.__wbPlayerUiInstalled)return;
+  window.__wbPlayerUiInstalled=true;
+  const palette=['#ff6258','#ffc21a','#58c7ff','#7ee081','#c49bff','#ff8fca','#f2f2ed','#ff9e42'];
   function colorForNick(nick){
-    const s = String(nick || 'Игрок').trim().toLocaleLowerCase('ru-RU');
-    let h = 0;
-    for(let i=0;i<s.length;i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-    return palette[h % palette.length];
+    const s=String(nick||'Игрок').trim().toLocaleLowerCase('ru-RU');
+    let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;
+    return palette[h%palette.length];
   }
   function getNick(){
     for(const k of Object.keys(localStorage)){
       if(/nick|username|player.?name/i.test(k)){
-        const v=localStorage.getItem(k);
-        if(v && v.trim() && v.length<40) return v.trim();
+        const v=localStorage.getItem(k);if(v&&v.trim()&&v.length<40)return v.trim();
       }
     }
     const input=[...document.querySelectorAll('input')].find(x=>/ник|nickname|имя игрока|player name/i.test((x.placeholder||'')+' '+(x.getAttribute('aria-label')||'')));
-    return input && input.value.trim() ? input.value.trim() : 'Игрок';
+    return input&&input.value.trim()?input.value.trim():'Игрок';
   }
   function getLobbyCode(){
     let code=localStorage.getItem('wb_lobby_code');
-    if(!/^\d{5}$/.test(code||'')){
-      code=String(Math.floor(10000+Math.random()*90000));
-      localStorage.setItem('wb_lobby_code',code);
-    }
+    if(!/^\d{5}$/.test(code||'')){code=String(Math.floor(10000+Math.random()*90000));localStorage.setItem('wb_lobby_code',code);}
     return code;
   }
-  const toggle=document.createElement('button');
-  toggle.id='wbPlayersToggle'; toggle.type='button';
-  toggle.innerHTML='<span aria-hidden="true">☷</span><span>Игроки</span>';
-  toggle.setAttribute('aria-expanded','false');
-  const panel=document.createElement('section');
-  panel.id='wbPlayersPanel'; panel.hidden=true;
-  panel.innerHTML='<div class="wb-head"><span>Список игроков</span><button class="wb-close" type="button" aria-label="Закрыть">×</button></div><div class="wb-list"></div><div class="wb-lobby"><div class="wb-lobby-label">Код лобби</div><div class="wb-code-row"><span class="wb-code"></span><button class="wb-copy" type="button">Копировать</button></div><div class="wb-note">Код создаётся в этом браузере</div></div>';
-  document.body.append(toggle,panel);
+  const panel=document.createElement('section');panel.id='wbPlayersPanel';panel.hidden=true;
+  panel.innerHTML='<div class="wb-head"><span>Игроки</span><button class="wb-close" type="button" aria-label="Закрыть">×</button></div><div class="wb-list"></div><div class="wb-lobby"><div class="wb-code-row"><span class="wb-code"></span><button class="wb-copy ib wide" type="button" aria-label="Скопировать код лобби">Копировать</button></div></div>';
+  const toggle=document.createElement('button');toggle.id='wbPlayersToggle';toggle.type='button';toggle.className='ib wide';toggle.title='Список игроков';toggle.setAttribute('aria-label','Список игроков');toggle.setAttribute('aria-expanded','false');
+  toggle.innerHTML='<span aria-hidden="true">♟</span><span>Игроки</span>';
+  const toolbar=document.getElementById('ctrl');
+  if(!toolbar)return;
+  toolbar.appendChild(toggle);document.body.appendChild(panel);
   function render(){
-    const nick=getNick(), color=colorForNick(nick);
-    panel.querySelector('.wb-list').innerHTML='';
-    const row=document.createElement('div'); row.className='wb-player';
-    const avatar=document.createElement('div'); avatar.className='wb-avatar'; avatar.style.background=color; avatar.textContent=[...nick][0]||'?';
-    const info=document.createElement('div');
-    const name=document.createElement('div'); name.className='wb-name'; name.style.color=color; name.textContent=nick;
-    const sub=document.createElement('div'); sub.className='wb-sub'; sub.textContent='Вы · цвет по нику';
-    info.append(name,sub); row.append(avatar,info); panel.querySelector('.wb-list').append(row);
+    const nick=getNick(),color=colorForNick(nick),list=panel.querySelector('.wb-list');
+    list.replaceChildren();
+    const row=document.createElement('div');row.className='wb-player';row.style.setProperty('--player-color',color);
+    const avatar=document.createElement('span');avatar.className='wb-avatar';avatar.setAttribute('aria-hidden','true');avatar.textContent='♟';
+    const name=document.createElement('span');name.className='wb-name';name.textContent=nick;
+    const swatch=document.createElement('span');swatch.className='wb-color';swatch.title='Цвет игрока';swatch.setAttribute('aria-label','Цвет игрока');
+    row.append(avatar,name,swatch);list.appendChild(row);
     panel.querySelector('.wb-code').textContent=getLobbyCode();
   }
   function setOpen(open){panel.hidden=!open;toggle.setAttribute('aria-expanded',String(open));if(open)render();}
   toggle.addEventListener('click',()=>setOpen(panel.hidden));
   panel.querySelector('.wb-close').addEventListener('click',()=>setOpen(false));
   panel.querySelector('.wb-copy').addEventListener('click',async()=>{
-    const code=panel.querySelector('.wb-code').textContent, btn=panel.querySelector('.wb-copy');
-    try{await navigator.clipboard.writeText(code);btn.textContent='Скопировано!';}
-    catch(e){const ta=document.createElement('textarea');ta.value=code;ta.style.position='fixed';ta.style.opacity='0';document.body.append(ta);ta.select();try{document.execCommand('copy');btn.textContent='Скопировано!';}catch(_){btn.textContent='Не удалось';}ta.remove();}
-    setTimeout(()=>btn.textContent='Копировать',1400);
+    const code=panel.querySelector('.wb-code').textContent,btn=panel.querySelector('.wb-copy');
+    try{await navigator.clipboard.writeText(code);btn.textContent='Готово';}
+    catch(e){const ta=document.createElement('textarea');ta.value=code;ta.style.position='fixed';ta.style.opacity='0';document.body.append(ta);ta.select();try{document.execCommand('copy');btn.textContent='Готово';}catch(_){btn.textContent='Ошибка';}ta.remove();}
+    setTimeout(()=>btn.textContent='Копировать',1300);
   });
-  function hideTimeControls(){
-    for(const el of document.querySelectorAll('button,[role="button"],.btn,.control')){
-      if(el===toggle || panel.contains(el)) continue;
-      const t=(el.innerText||el.getAttribute('aria-label')||el.title||'').trim().toLocaleLowerCase('ru-RU');
-      if(t && (/замедл.*врем|врем.*замедл|slow.?motion|time.?slow|пауза|pause/.test(t))){
+  function hideUnwantedControls(){
+    for(const el of document.querySelectorAll('#ctrl button,[role="button"],button')){
+      if(el===toggle||panel.contains(el))continue;
+      const t=((el.innerText||'')+' '+(el.getAttribute('aria-label')||'')+' '+(el.title||'')).trim().toLocaleLowerCase('ru-RU');
+      if(!t)continue;
+      if(/замедл.*врем|врем.*замедл|slow.?motion|time.?slow|пауза|pause|гравитац|gravity|убрать обломки|очистить обломки|очистка обломков|clear debris|remove debris/.test(t)){
         el.style.setProperty('display','none','important');
-        el.setAttribute('data-wb-hidden-time-control','true');
+        el.setAttribute('data-wb-hidden-control','true');
       }
     }
   }
-  render(); hideTimeControls();
-  new MutationObserver(()=>hideTimeControls()).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['aria-label','title']});
+  render();hideUnwantedControls();
+  new MutationObserver(hideUnwantedControls).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['aria-label','title']});
 })();
 </script>
 
