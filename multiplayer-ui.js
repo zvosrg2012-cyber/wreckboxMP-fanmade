@@ -29,8 +29,6 @@ const css=[
 '.wbmp .mapchoice{display:flex;gap:8px;align-items:center;margin:12px 0}',
 '.wbmp .mapchoice select{flex:1;min-width:0;background:var(--room2,#101216);color:var(--ink,#f3f0e7);border:1px solid var(--frame,#64655f);padding:10px}',
 '#mp_settings .wbmp-nick-setting{display:flex;flex-direction:column;gap:7px;margin-top:18px;padding-top:12px;border-top:1px solid var(--line,rgba(255,255,255,.1))}#mp_settings .wbmp-nick-setting .field{width:100%;background:var(--room2,#101216);color:var(--ink,#f3f0e7);border:1px solid var(--line,rgba(255,255,255,.15));padding:10px}',
-'.materials button,.materials [role=option],[class*="material"] button,[class*="material"] [role=option],[id*="material"] button,[id*="material"] [role=option],[class*="Material"] button,[id*="Material"] button{background-color:#fff!important;background-image:none!important;color:#171717!important;border-color:#fff!important}',
-'.materials button *,[class*="material"] button *,[id*="material"] button *,[class*="Material"] button *{color:#171717!important}',
 ].join('');
 const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
 const root=document.createElement('div');root.className='wbmp';document.body.appendChild(root);
