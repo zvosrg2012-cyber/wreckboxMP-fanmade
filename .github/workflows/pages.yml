@@ -1,4 +1,4 @@
-name: Build browser game with player list
+name: Build browser game with multiplayer test UI
 on:
   push:
     branches: [main]
@@ -17,12 +17,12 @@ jobs:
         run: |
           mkdir -p dist
           cp -R index.html assets inventory.json dist/ 2>/dev/null || true
-          cp player-list.js dist/player-list.js
+          cp multiplayer-ui.js dist/multiplayer-ui.js
           python3 - <<'PY'
           from pathlib import Path
           p = Path("dist/index.html")
           html = p.read_text(encoding="utf-8")
-          tag = '<script src="./player-list.js"></script>'
+          tag = '<script src="./multiplayer-ui.js"></script>'
           if tag not in html:
               pos = html.lower().rfind("</body>")
               html = html[:pos] + tag + html[pos:] if pos >= 0 else html + tag
