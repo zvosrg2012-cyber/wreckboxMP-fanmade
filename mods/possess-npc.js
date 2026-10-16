@@ -155,7 +155,7 @@
   }
   function interact(item) {
     if (!S.target || !item) return;
-    if (item.kind === 'door') {
+    if (item.kind === 'door' && S.mode === 'door-link') {
       if (!S.selectedDoor) {
         S.selectedDoor = item;
         S.doorOutlines.push(outline(item, 0x258dff));
@@ -169,6 +169,11 @@
       S.doorPair = [first, item];
       return;
     }
+    if (item.kind === 'door') {
+      try { S.api?.interact?.(S.target, item); } catch {}
+      fadeOutline(S.hoverOutline); S.hoverOutline = null; S.hovered = null;
+      return;
+    }
     // The game's native interaction owns the actual animation and prop logic.
     try {
       if (typeof S.api?.interact === 'function') S.api.interact(S.target, item);
@@ -176,6 +181,22 @@
       else if (item.kind === 'work') S.api?.playAnimation?.(S.target, item.animation || 'work');
     } catch (e) { console.warn('[Possession] interaction failed', e); }
     fadeOutline(S.hoverOutline); S.hoverOutline = null; S.hovered = null;
+  }
+  function interactNearestSeatOrWork() {
+    if (!S.target) return;
+    const T = THREE();
+    if (!T?.Vector3) return;
+    const pos = S.target.object.getWorldPosition(new T.Vector3());
+    let best = null, bestD = Infinity;
+    for (const item of allItems()) {
+      if (!['seat','work','prop'].includes(item.kind)) continue;
+      try {
+        const p = item.object.getWorldPosition(new T.Vector3());
+        const d = pos.distanceTo(p);
+        if (d < (item.useDistance || 2.0) && d < bestD) { best = item; bestD = d; }
+      } catch {}
+    }
+    if (best) interact(best);
   }
   function handlePointerMove(e) {
     if (!S.target || S.noclip) return;
@@ -203,6 +224,7 @@
     if (e.code === 'Escape') release();
     if (e.code === 'KeyN') toggleNoclip();
     if (e.code === 'KeyE' && S.hovered) interact(S.hovered);
+    if (e.code === 'KeyF') interactNearestSeatOrWork();
     if (e.code === 'KeyQ') {
       S.mode = S.mode === 'door-link' ? 'interact' : 'door-link';
       clearDoorPair();
