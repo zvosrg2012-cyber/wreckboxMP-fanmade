@@ -29,9 +29,8 @@
   const S = {
     api: null, target: null, keys: new Set(), mode: 'possess',
     noclip: false, verticalVelocity: 0, lastTime: 0, lastGroundY: null,
-    fallingLock: false, savedCameraInput: null,
     selectedDoor: null, hovered: null, hoverOutline: null, doorOutlines: [],
-    interaction: null, savedCameraInput: null, unregisterElement: null,
+    interaction: null, unregisterElement: null,
     speed: 4.8, runSpeed: 8.0, jumpSpeed: 6.5, gravity: 19,
     interactables: [], pointer: null, disposed: false
   };
@@ -126,11 +125,6 @@
     try { npc.pauseAI?.(); } catch (e) { console.warn('[Possession] pause AI failed', e); }
     try { S.api.setCameraTarget(npc.object); } catch {}
     try { S.api.setElementalHUDVisible?.(false); } catch {}
-    try { S.api.setCharacterPhysics?.(npc, true); S.api.setCharacterCollision?.(npc, true); } catch {}
-    // Controlled NPCs should not take catastrophic collision damage from normal movement.
-    try { S.api.setCollisionDamageScale?.(npc, 0.12); } catch {}
-    try { S.savedCameraInput = S.api.getCameraInputEnabled?.(); } catch { S.savedCameraInput = undefined; }
-    try { S.api.setCameraInputEnabled?.(true); } catch {}
   }
   function release() {
     if (!S.target) return;
@@ -140,8 +134,6 @@
     S.target = null; S.keys.clear(); S.verticalVelocity = 0; S.noclip = false;
     try { S.api?.setCameraTarget?.(null); } catch {}
     try { S.api?.setElementalHUDVisible?.(true); } catch {}
-    try { S.api?.setCharacterPhysics?.(old, true); S.api?.setCharacterCollision?.(old, true); } catch {}
-    try { S.api?.setCollisionDamageScale?.(old, 1); } catch {}
     try { old.resumeAI?.(); } catch (e) { console.warn('[Possession] resume AI failed', e); }
     clearHover(); clearDoorPair();
   }
@@ -220,10 +212,6 @@
   function onKeyDown(e) {
     if (!S.target) return;
     const movementKeys = ['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'];
-    if (!S.noclip && S.fallingLock && movementKeys.includes(e.code)) {
-      e.preventDefault(); e.stopImmediatePropagation(); e.stopPropagation();
-      S.keys.delete(e.code); return;
-    }
     if (['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','ShiftLeft','ShiftRight','Escape','KeyN','KeyE','KeyQ'].includes(e.code)) {
       e.preventDefault(); e.stopPropagation();
     }
@@ -279,23 +267,6 @@
       return;
     }
 
-    // Never let movement keys drive the camera while the resident is falling.
-    const fallingNow = isFalling();
-    S.fallingLock = fallingNow;
-    if (fallingNow) {
-      S.keys.delete('KeyW'); S.keys.delete('KeyA'); S.keys.delete('KeyS'); S.keys.delete('KeyD');
-      S.keys.delete('ArrowUp'); S.keys.delete('ArrowDown'); S.keys.delete('ArrowLeft'); S.keys.delete('ArrowRight');
-      try {
-        if (typeof S.api.setCameraKeyboardInputEnabled === 'function') S.api.setCameraKeyboardInputEnabled(false);
-        else S.api.setCameraInputEnabled?.(false);
-      } catch {}
-      move.set(0, 0, 0);
-    } else {
-      try {
-        if (typeof S.api.setCameraKeyboardInputEnabled === 'function') S.api.setCameraKeyboardInputEnabled(true);
-        else S.api.setCameraInputEnabled?.(true);
-      } catch {}
-    }
     if (move.lengthSq()) {
       move.normalize().multiplyScalar((S.keys.has('ShiftLeft') || S.keys.has('ShiftRight') ? S.runSpeed : S.speed) * dt);
       moveObject(move);
