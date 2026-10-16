@@ -29,6 +29,7 @@
   const S = {
     api: null, target: null, keys: new Set(), mode: 'possess',
     noclip: false, verticalVelocity: 0, lastTime: 0, lastGroundY: null,
+    fallingLock: false, savedCameraInput: null,
     selectedDoor: null, hovered: null, hoverOutline: null, doorOutlines: [],
     interaction: null, savedCameraInput: null, unregisterElement: null,
     speed: 4.8, runSpeed: 8.0, jumpSpeed: 6.5, gravity: 19,
@@ -128,6 +129,7 @@
     try { S.api.setCharacterPhysics?.(npc, true); S.api.setCharacterCollision?.(npc, true); } catch {}
     // Controlled NPCs should not take catastrophic collision damage from normal movement.
     try { S.api.setCollisionDamageScale?.(npc, 0.12); } catch {}
+    try { S.savedCameraInput = S.api.getCameraInputEnabled?.(); } catch { S.savedCameraInput = undefined; }
     try { S.api.setCameraInputEnabled?.(true); } catch {}
   }
   function release() {
@@ -217,6 +219,11 @@
   }
   function onKeyDown(e) {
     if (!S.target) return;
+    const movementKeys = ['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'];
+    if (!S.noclip && S.fallingLock && movementKeys.includes(e.code)) {
+      e.preventDefault(); e.stopImmediatePropagation(); e.stopPropagation();
+      S.keys.delete(e.code); return;
+    }
     if (['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','ShiftLeft','ShiftRight','Escape','KeyN','KeyE','KeyQ'].includes(e.code)) {
       e.preventDefault(); e.stopPropagation();
     }
@@ -232,7 +239,11 @@
   }
   function onKeyUp(e) { S.keys.delete(e.code); }
   function isFalling() {
-    try { return !!S.api?.isFalling?.(S.target); } catch { return false; }
+    try {
+      if (typeof S.api?.isFalling === 'function') return !!S.api.isFalling(S.target);
+      const grounded = typeof S.api?.isGrounded === 'function' ? !!S.api.isGrounded(S.target) : null;
+      return grounded === false && S.verticalVelocity < -0.15;
+    } catch { return S.verticalVelocity < -0.15; }
   }
   function moveObject(displacement) {
     if (typeof S.api?.moveCharacter === 'function') {
@@ -269,13 +280,21 @@
     }
 
     // Never let movement keys drive the camera while the resident is falling.
-    if (isFalling()) {
+    const fallingNow = isFalling();
+    S.fallingLock = fallingNow;
+    if (fallingNow) {
       S.keys.delete('KeyW'); S.keys.delete('KeyA'); S.keys.delete('KeyS'); S.keys.delete('KeyD');
       S.keys.delete('ArrowUp'); S.keys.delete('ArrowDown'); S.keys.delete('ArrowLeft'); S.keys.delete('ArrowRight');
-      try { S.api.setCameraInputEnabled?.(false); } catch {}
+      try {
+        if (typeof S.api.setCameraKeyboardInputEnabled === 'function') S.api.setCameraKeyboardInputEnabled(false);
+        else S.api.setCameraInputEnabled?.(false);
+      } catch {}
       move.set(0, 0, 0);
     } else {
-      try { S.api.setCameraInputEnabled?.(true); } catch {}
+      try {
+        if (typeof S.api.setCameraKeyboardInputEnabled === 'function') S.api.setCameraKeyboardInputEnabled(true);
+        else S.api.setCameraInputEnabled?.(true);
+      } catch {}
     }
     if (move.lengthSq()) {
       move.normalize().multiplyScalar((S.keys.has('ShiftLeft') || S.keys.has('ShiftRight') ? S.runSpeed : S.speed) * dt);
@@ -284,14 +303,29 @@
       obj.rotation.y = Math.atan2(move.x, move.z);
     }
 
-    const grounded = (() => { try { return !!S.api.isGrounded?.(S.target); } catch { return false; } })();
+    const grounded = (() => {
+      try {
+        if (typeof S.api.isGrounded === 'function') return !!S.api.isGrounded(S.target);
+        if (typeof S.api.findGround === 'function') {
+          const ground = S.api.findGround(S.target);
+          if (typeof ground === 'boolean') return ground;
+          if (typeof ground === 'number') return obj.position.y <= ground + 0.08;
+          if (ground && typeof ground.y === 'number') return obj.position.y <= ground.y + 0.08;
+        }
+      } catch {}
+      return false;
+    })();
     if (S.keys.has('Space') && grounded) { S.verticalVelocity = S.jumpSpeed; S.keys.delete('Space'); }
-    S.verticalVelocity -= S.gravity * dt;
+    if (!grounded || S.verticalVelocity > 0) S.verticalVelocity -= S.gravity * dt;
+    if (grounded && S.verticalVelocity < 0) S.verticalVelocity = 0;
     const dy = S.verticalVelocity * dt;
     if (typeof S.api.setCharacterVelocity === 'function') {
       try { S.api.setCharacterVelocity(S.target, new T.Vector3(0, S.verticalVelocity, 0)); } catch {}
-    } else moveObject(new T.Vector3(0, dy, 0));
-    if (grounded && S.verticalVelocity < 0) S.verticalVelocity = 0;
+    } else if (typeof S.api.moveCharacter === 'function') {
+      try { S.api.moveCharacter(S.target, new T.Vector3(0, dy, 0)); } catch {}
+    } else {
+      obj.position.y += dy;
+    }
 
     // Crossing a linked door clears both blue highlights.
     if (S.doorPair?.length === 2) {
