@@ -85,7 +85,27 @@
   }
   function outline(item, color) {
     try {
-      if (typeof S.api?.createOutline === 'function') return S.api.createOutline(item.object, color);
+      if (typeof S.api?.createOutline === 'function') {
+        const T = THREE();
+        let lift = 0.5;
+        if (item.kind === 'door' && T?.Box3 && T?.Vector3) {
+          const bounds = new T.Box3().setFromObject(item.object);
+          const height = bounds.max.y - bounds.min.y;
+          if (Number.isFinite(height) && height > 0) lift = height * 0.5;
+        }
+        // Pass a vertical offset to adapters that support it; then lift exposed helper groups.
+        const created = S.api.createOutline(item.object, color, { offsetY: lift, lift });
+        if (item.kind === 'door') {
+          const helper = created?.object || created?.group || created?.outlineObject || created?.helper;
+          if (helper?.position && helper.userData?.wreckboxOutlineLiftApplied !== true) {
+            helper.position.y += lift;
+            helper.userData = helper.userData || {};
+            helper.userData.wreckboxOutlineLiftApplied = true;
+          }
+          try { created?.setOffsetY?.(lift); } catch {}
+        }
+        return created;
+      }
     } catch (e) { console.warn('[Possession] outline failed', e); }
     // Fallback: non-destructive emissive tint on meshes, with original material values restored.
     const saved = [];
