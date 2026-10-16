@@ -1,16 +1,22 @@
-# NPC Possession prototype
+# Вселение в NPC — экспериментальный мод
 
-Integrated in the game's inline runtime on branch `mod/possess-npc-prototype`.
+Мод встроен в `index.html` в ветке `mod/possess-npc-prototype`. Он использует существующие объекты жителей и систему действий/предметов игры, не заменяя генерацию жителей.
 
-## Controls
-- **F6** — enter NPC selection mode.
-- **Left-click a resident** — possess them.
-- **W / A / S / D** or arrow keys — move.
-- **Shift** — run.
-- **Space** — jump.
-- **Esc** — release the resident.
+## Управление
 
-While possessing, the normal HUD is hidden and the camera follows the selected resident. The possession code targets the game's existing resident objects; it does not replace the resident creation system.
+- **Кнопка «👤 Вселение» справа на экране** — включить выбор жителя; затем нажать на NPC.
+- **Кнопка «↩ Выход из NPC»** или **Esc** — выйти из тела жителя.
+- **A / D** или стрелки влево/вправо — ходьба.
+- **Shift** — бег.
+- **Space / W** — прыжок.
+- **E** — перейти через ближайшую дверь, если стоишь рядом с ней.
+- **F** — использовать ближайший стул/диван или рабочий предмет; движение прерывает действие.
+- **V** — включить/выключить ноуклип.
+- **В режиме ноуклипа:** WASD — летать, Space — вверх, Ctrl — вниз, Shift — быстрее.
+- **F6** — альтернативный способ начать выбор жителя.
 
-## Status and limitations
-This is an experimental first integration. JavaScript syntax was checked after patching the obfuscated runtime, but the game itself has not been launched in this environment. In-game behavior still needs testing, especially whether the original resident AI fully yields while `state === "possessed"`, jumping/ground collisions, and restoring the previous HUD state. No claim is made that these behaviors are verified.
+Во время вселения камера следует за жителем, а обычные панели HUD скрываются. Житель поворачивается по направлению горизонтального движения.
+
+## Статус
+
+Это экспериментальная интеграция непосредственно в исходный HTML игры. В этой среде игру нельзя запустить для проверки реальной физики и анимаций; проверь в самой игре выбор NPC, двери, предметы и выход. Переход через двери ищет ближайшую связь типа `door` из навигационного графа. Действия у предметов используют встроенные функции игры, а ноуклип перемещает жителя напрямую без обычного наземного ограничения.
