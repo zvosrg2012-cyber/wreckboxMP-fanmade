@@ -1,192 +1,293 @@
 /**
- * Wreckbox — Possess NPC prototype
- * Branch: mod/possess-npc-prototype
+ * Wreckbox — Possession / resident interaction integration layer
  *
- * Reference prototype only. The active experimental integration now lives in
- * index.html's inline runtime; see mods/README.md for controls and limitations.
+ * IMPORTANT: the game's main runtime in index.html is packed/obfuscated.
+ * This module intentionally does not patch resident AI internals. It connects
+ * through window.wreckboxModAPI when a compatible bridge is exposed by the game.
  *
- * Expected bridge:
- * window.wreckboxModAPI = {
- *   canvas: HTMLCanvasElement,
- *   camera: THREE.Camera,
- *   scene: THREE.Scene,
- *   getNPCs(): Array<{ object: THREE.Object3D, pauseAI(): void, resumeAI(): void }>,
- *   setCameraTarget(object: THREE.Object3D|null): void,
- *   setElementalHUDVisible(visible: boolean): void
+ * Bridge contract (all methods except the first group are optional):
+ * {
+ *   canvas, camera, scene, THREE,
+ *   getNPCs(): [{object, pauseAI(), resumeAI(), ...}],
+ *   getInteractables(): [{object, kind:'door'|'seat'|'work'|'prop', ...}],
+ *   setCameraTarget(object|null), setElementalHUDVisible(boolean),
+ *   registerElemental({id,label,icon,onActivate}) -> unregister?,
+ *   isGrounded(npc), isFalling(npc), moveCharacter(npc, displacement),
+ *   setCharacterVelocity(npc, velocity), setCharacterPhysics(npc, enabled),
+ *   setCharacterCollision(npc, enabled), setNoclip(npc, enabled),
+ *   findGround(npc), playAnimation(npc, name), stopAnimation(npc),
+ *   interact(npc, item), teleportThroughDoor(npc, fromDoor, toDoor),
+ *   createOutline(object, color) -> {dispose()}, setCollisionDamageScale(npc, scale),
+ *   setCameraInputEnabled(boolean), getCameraInputEnabled()
  * }
- *
- * Controls: click an NPC to possess it; WASD move; Space jump; Escape release.
- * Does not modify NPC routines, jobs, sleep, seats, doors, or teleport links.
  */
 (() => {
   'use strict';
-
   if (window.__wreckboxPossessNPC) return;
   window.__wreckboxPossessNPC = true;
 
-  const state = {
-    api: null,
-    target: null,
-    keys: new Set(),
-    verticalVelocity: 0,
-    grounded: true,
-    speed: 5,
-    jumpSpeed: 7,
-    lastTime: 0,
-    status: 'Waiting for game bridge…'
+  const S = {
+    api: null, target: null, keys: new Set(), mode: 'possess',
+    noclip: false, verticalVelocity: 0, lastTime: 0, lastGroundY: null,
+    selectedDoor: null, hovered: null, hoverOutline: null, doorOutlines: [],
+    interaction: null, savedCameraInput: null, unregisterElement: null,
+    speed: 4.8, runSpeed: 8.0, jumpSpeed: 6.5, gravity: 19,
+    interactables: [], pointer: null, disposed: false
   };
+  const THREE = () => S.api?.THREE || window.THREE || null;
 
-  const overlay = document.createElement('div');
-  overlay.id = 'wreckbox-possess-overlay';
-  Object.assign(overlay.style, {
-    position: 'fixed', left: '12px', bottom: '12px', zIndex: '2147483647',
-    padding: '8px 11px', color: '#fff', background: 'rgba(0,0,0,.72)',
-    border: '1px solid rgba(255,255,255,.25)', borderRadius: '8px',
-    font: '12px/1.45 system-ui,sans-serif', pointerEvents: 'none',
-    whiteSpace: 'pre-line', maxWidth: '320px'
-  });
-  overlay.textContent = 'Wreckbox Possess NPC\nWaiting for game bridge…';
-  document.documentElement.appendChild(overlay);
-
-  function setStatus(message) {
-    state.status = message;
-    overlay.textContent = 'Wreckbox Possess NPC\n' + message +
-      (state.target ? '\nWASD move · Space jump · Esc release' : '\nClick an NPC to possess it');
-  }
-
-  function resolveAPI() {
-    const api = window.wreckboxModAPI;
-    if (!api || !api.canvas || !api.camera || !api.scene ||
-        typeof api.getNPCs !== 'function' ||
-        typeof api.setCameraTarget !== 'function') return false;
-    state.api = api;
-    setStatus('Ready — click an NPC');
+  function apiReady() {
+    const a = window.wreckboxModAPI;
+    if (!a?.canvas || !a?.camera || !a?.scene ||
+        typeof a.getNPCs !== 'function' || typeof a.setCameraTarget !== 'function') return false;
+    S.api = a;
+    registerElement();
     return true;
   }
-
-  function getThree() {
-    return window.THREE || state.api?.THREE || null;
+  function registerElement() {
+    if (S.unregisterElement || typeof S.api?.registerElemental !== 'function') return;
+    // The game owns placement and styling: this is an elemental slot, not an overlay.
+    const result = S.api.registerElemental({
+      id: 'possession', label: 'Вселяние', icon: '◉',
+      onActivate: () => { S.mode = S.mode === 'possess' ? 'interact' : 'possess'; }
+    });
+    if (typeof result === 'function') S.unregisterElement = result;
   }
-
-  function possess(npc) {
-    if (!npc || !npc.object) return;
-    release();
-    state.target = npc;
-    try { npc.pauseAI?.(); } catch (e) { console.warn('[Possess NPC] pauseAI failed', e); }
-    try { state.api.setCameraTarget(npc.object); } catch (e) { console.warn(e); }
-    try { state.api.setElementalHUDVisible?.(false); } catch (e) { console.warn(e); }
-    state.verticalVelocity = 0;
-    state.grounded = true;
-    setStatus('Possessing NPC');
+  function allNPCs() { try { return S.api?.getNPCs?.() || []; } catch { return []; } }
+  function allItems() {
+    try {
+      const items = S.api?.getInteractables?.() || [];
+      return items.filter(x => x?.object && ['door','seat','work','prop'].includes(x.kind));
+    } catch { return []; }
   }
-
-  function release() {
-    if (!state.target) return;
-    const previous = state.target;
-    state.target = null;
-    state.keys.clear();
-    state.verticalVelocity = 0;
-    try { state.api?.setCameraTarget(null); } catch (e) { console.warn(e); }
-    try { state.api?.setElementalHUDVisible?.(true); } catch (e) { console.warn(e); }
-    try { previous.resumeAI?.(); } catch (e) { console.warn('[Possess NPC] resumeAI failed', e); }
-    setStatus('Released — click an NPC');
-  }
-
-  function pickNPC(event) {
-    if (!state.api || !resolveAPI()) return;
-    const THREE = getThree();
-    if (!THREE?.Raycaster || !THREE?.Vector2) {
-      setStatus('Bridge ready, but THREE.Raycaster is unavailable');
-      return;
+  function rootMatch(object, list) {
+    let o = object;
+    while (o) {
+      const found = list.find(x => x.object === o);
+      if (found) return found;
+      o = o.parent;
     }
-    const canvas = state.api.canvas;
-    const rect = canvas.getBoundingClientRect();
-    const pointer = new THREE.Vector2(
+    return null;
+  }
+  function raycast(event, objects) {
+    const T = THREE();
+    if (!T?.Raycaster || !T?.Vector2 || !objects.length) return null;
+    const rect = S.api.canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    const p = new T.Vector2(
       ((event.clientX - rect.left) / rect.width) * 2 - 1,
       -((event.clientY - rect.top) / rect.height) * 2 + 1
     );
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(pointer, state.api.camera);
-    const npcs = state.api.getNPCs() || [];
-    const roots = npcs.filter(n => n?.object).map(n => n.object);
-    const hits = raycaster.intersectObjects(roots, true);
-    if (!hits.length) return;
-
-    let hitObject = hits[0].object;
-    let match = null;
-    while (hitObject && !match) {
-      match = npcs.find(n => n.object === hitObject) || null;
-      hitObject = hitObject.parent;
+    const ray = new T.Raycaster();
+    ray.setFromCamera(p, S.api.camera);
+    const hits = ray.intersectObjects(objects.map(x => x.object), true);
+    return hits.length ? rootMatch(hits[0].object, objects) : null;
+  }
+  function outline(item, color) {
+    try {
+      if (typeof S.api?.createOutline === 'function') return S.api.createOutline(item.object, color);
+    } catch (e) { console.warn('[Possession] outline failed', e); }
+    // Fallback: non-destructive emissive tint on meshes, with original material values restored.
+    const saved = [];
+    item.object.traverse?.(o => {
+      if (!o.isMesh || !o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of mats) {
+        if (!m.color) continue;
+        saved.push({m, color: m.color.clone(), emissive: m.emissive?.clone?.(), intensity: m.emissiveIntensity});
+        try { m.emissive?.set?.(color); m.emissiveIntensity = 0.45; } catch {}
+      }
+    });
+    return { dispose() { for (const x of saved) {
+      try { x.m.color.copy(x.color); if (x.emissive) x.m.emissive.copy(x.emissive); x.m.emissiveIntensity = x.intensity; } catch {}
+    } } };
+  }
+  function clearHover() {
+    try { S.hoverOutline?.dispose?.(); } catch {}
+    S.hoverOutline = null; S.hovered = null;
+  }
+  function clearDoorPair() {
+    for (const o of S.doorOutlines) try { o?.dispose?.(); } catch {}
+    S.doorOutlines = []; S.selectedDoor = null;
+  }
+  function fadeOutline(outlineObject) {
+    if (!outlineObject) return;
+    // Native bridge outlines may animate their own fade-out.
+    try {
+      if (typeof outlineObject.fadeOut === 'function') outlineObject.fadeOut(220);
+      else outlineObject.dispose?.();
+    } catch {}
+  }
+  function possess(npc) {
+    if (!npc?.object) return;
+    release();
+    S.target = npc; S.verticalVelocity = 0; S.lastGroundY = null;
+    try { npc.pauseAI?.(); } catch (e) { console.warn('[Possession] pause AI failed', e); }
+    try { S.api.setCameraTarget(npc.object); } catch {}
+    try { S.api.setElementalHUDVisible?.(false); } catch {}
+    try { S.api.setCharacterPhysics?.(npc, true); S.api.setCharacterCollision?.(npc, true); } catch {}
+    // Controlled NPCs should not take catastrophic collision damage from normal movement.
+    try { S.api.setCollisionDamageScale?.(npc, 0.12); } catch {}
+    try { S.api.setCameraInputEnabled?.(true); } catch {}
+  }
+  function release() {
+    if (!S.target) return;
+    const old = S.target;
+    try { if (S.noclip) toggleNoclip(false); } catch {}
+    try { S.api?.stopAnimation?.(old); } catch {}
+    S.target = null; S.keys.clear(); S.verticalVelocity = 0; S.noclip = false;
+    try { S.api?.setCameraTarget?.(null); } catch {}
+    try { S.api?.setElementalHUDVisible?.(true); } catch {}
+    try { S.api?.setCharacterPhysics?.(old, true); S.api?.setCharacterCollision?.(old, true); } catch {}
+    try { S.api?.setCollisionDamageScale?.(old, 1); } catch {}
+    try { old.resumeAI?.(); } catch (e) { console.warn('[Possession] resume AI failed', e); }
+    clearHover(); clearDoorPair();
+  }
+  function toggleNoclip(force) {
+    if (!S.target) return;
+    S.noclip = typeof force === 'boolean' ? force : !S.noclip;
+    const enabled = S.noclip;
+    // Explicitly disable BOTH physics and collision while noclip is active.
+    try { S.api?.setNoclip?.(S.target, enabled); } catch {}
+    try { S.api?.setCharacterPhysics?.(S.target, !enabled); } catch {}
+    try { S.api?.setCharacterCollision?.(S.target, !enabled); } catch {}
+    S.verticalVelocity = 0;
+  }
+  function interact(item) {
+    if (!S.target || !item) return;
+    if (item.kind === 'door') {
+      if (!S.selectedDoor) {
+        S.selectedDoor = item;
+        S.doorOutlines.push(outline(item, 0x258dff));
+        return;
+      }
+      if (S.selectedDoor === item) { clearDoorPair(); return; }
+      const first = S.selectedDoor;
+      S.doorOutlines.push(outline(item, 0x258dff));
+      try { S.api?.linkDoors?.(first, item); } catch {}
+      // Store a pair for crossing detection. Clear highlights after crossing.
+      S.doorPair = [first, item];
+      return;
     }
-    if (match) {
-      event.preventDefault();
-      event.stopPropagation();
-      possess(match);
+    // The game's native interaction owns the actual animation and prop logic.
+    try {
+      if (typeof S.api?.interact === 'function') S.api.interact(S.target, item);
+      else if (item.kind === 'seat') S.api?.playAnimation?.(S.target, item.animation || 'sit');
+      else if (item.kind === 'work') S.api?.playAnimation?.(S.target, item.animation || 'work');
+    } catch (e) { console.warn('[Possession] interaction failed', e); }
+    fadeOutline(S.hoverOutline); S.hoverOutline = null; S.hovered = null;
+  }
+  function handlePointerMove(e) {
+    if (!S.target || S.noclip) return;
+    const item = raycast(e, allItems());
+    if (item === S.hovered) return;
+    clearHover();
+    if (item) { S.hovered = item; S.hoverOutline = outline(item, 0xff463d); }
+  }
+  function handlePointerDown(e) {
+    if (!S.api || e.button !== 0 || e.target !== S.api.canvas) return;
+    if (!S.target) {
+      const npc = raycast(e, allNPCs());
+      if (npc) { e.preventDefault(); e.stopImmediatePropagation(); possess(npc); }
+      return;
+    }
+    const item = raycast(e, allItems());
+    if (item) { e.preventDefault(); e.stopImmediatePropagation(); interact(item); }
+  }
+  function onKeyDown(e) {
+    if (!S.target) return;
+    if (['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','ShiftLeft','ShiftRight','Escape','KeyN','KeyE','KeyQ'].includes(e.code)) {
+      e.preventDefault(); e.stopPropagation();
+    }
+    S.keys.add(e.code);
+    if (e.code === 'Escape') release();
+    if (e.code === 'KeyN') toggleNoclip();
+    if (e.code === 'KeyE' && S.hovered) interact(S.hovered);
+    if (e.code === 'KeyQ') {
+      S.mode = S.mode === 'door-link' ? 'interact' : 'door-link';
+      clearDoorPair();
     }
   }
-
-  function onKeyDown(event) {
-    if (['KeyW','KeyA','KeyS','KeyD','Space','Escape'].includes(event.code) && state.target) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-    state.keys.add(event.code);
-    if (event.code === 'Escape' && state.target) release();
+  function onKeyUp(e) { S.keys.delete(e.code); }
+  function isFalling() {
+    try { return !!S.api?.isFalling?.(S.target); } catch { return false; }
   }
-  function onKeyUp(event) { state.keys.delete(event.code); }
-
-  function tick(time) {
+  function moveObject(displacement) {
+    if (typeof S.api?.moveCharacter === 'function') {
+      S.api.moveCharacter(S.target, displacement); return;
+    }
+    S.target.object.position.add(displacement);
+  }
+  function tick(now) {
     requestAnimationFrame(tick);
-    const dt = state.lastTime ? Math.min((time - state.lastTime) / 1000, 0.05) : 0;
-    state.lastTime = time;
-    const target = state.target;
-    const api = state.api;
-    if (!target?.object || !api || dt <= 0) return;
+    const dt = S.lastTime ? Math.min((now - S.lastTime) / 1000, 0.04) : 0;
+    S.lastTime = now;
+    if (!S.target || !S.api || dt <= 0) return;
+    const T = THREE(); if (!T?.Vector3) return;
+    const obj = S.target.object;
+    const forward = new T.Vector3(); S.api.camera.getWorldDirection(forward); forward.y = 0;
+    if (forward.lengthSq()) forward.normalize();
+    const right = new T.Vector3(-forward.z, 0, forward.x);
+    const move = new T.Vector3();
+    if (S.keys.has('KeyW') || S.keys.has('ArrowUp')) move.add(forward);
+    if (S.keys.has('KeyS') || S.keys.has('ArrowDown')) move.sub(forward);
+    if (S.keys.has('KeyD') || S.keys.has('ArrowRight')) move.add(right);
+    if (S.keys.has('KeyA') || S.keys.has('ArrowLeft')) move.sub(right);
 
-    const THREE = getThree();
-    const object = target.object;
-    // Movement is relative to the camera's horizontal direction.
-    const forward = new THREE.Vector3();
-    api.camera.getWorldDirection(forward);
-    forward.y = 0;
-    if (forward.lengthSq() > 0) forward.normalize();
-    const right = new THREE.Vector3(-forward.z, 0, forward.x);
-    const move = new THREE.Vector3();
-    if (state.keys.has('KeyW')) move.add(forward);
-    if (state.keys.has('KeyS')) move.sub(forward);
-    if (state.keys.has('KeyD')) move.add(right);
-    if (state.keys.has('KeyA')) move.sub(right);
-    if (move.lengthSq() > 0) {
-      move.normalize().multiplyScalar(state.speed * dt);
-      object.position.add(move);
-      object.rotation.y = Math.atan2(move.x, move.z);
+    if (S.noclip) {
+      const fly = new T.Vector3();
+      if (S.keys.has('KeyW')) fly.add(forward);
+      if (S.keys.has('KeyS')) fly.sub(forward);
+      if (S.keys.has('KeyD')) fly.add(right);
+      if (S.keys.has('KeyA')) fly.sub(right);
+      if (S.keys.has('Space')) fly.y += 1;
+      if (S.keys.has('ShiftLeft') || S.keys.has('ShiftRight')) fly.y -= 1;
+      if (fly.lengthSq()) moveObject(fly.normalize().multiplyScalar((S.keys.has('ShiftLeft') ? S.runSpeed : S.speed) * dt));
+      return;
     }
 
-    if (state.keys.has('Space') && state.grounded) {
-      state.verticalVelocity = state.jumpSpeed;
-      state.grounded = false;
+    // Never let movement keys drive the camera while the resident is falling.
+    if (isFalling()) {
+      S.keys.delete('KeyW'); S.keys.delete('KeyA'); S.keys.delete('KeyS'); S.keys.delete('KeyD');
+      S.keys.delete('ArrowUp'); S.keys.delete('ArrowDown'); S.keys.delete('ArrowLeft'); S.keys.delete('ArrowRight');
+      try { S.api.setCameraInputEnabled?.(false); } catch {}
+      move.set(0, 0, 0);
+    } else {
+      try { S.api.setCameraInputEnabled?.(true); } catch {}
     }
-    state.verticalVelocity -= 18 * dt;
-    object.position.y += state.verticalVelocity * dt;
-    // Temporary ground plane. Replace with the game's collision/grounding API.
-    if (object.position.y <= 0) {
-      object.position.y = 0;
-      state.verticalVelocity = 0;
-      state.grounded = true;
+    if (move.lengthSq()) {
+      move.normalize().multiplyScalar((S.keys.has('ShiftLeft') || S.keys.has('ShiftRight') ? S.runSpeed : S.speed) * dt);
+      moveObject(move);
+      // Face the actual movement direction, not the camera's original heading.
+      obj.rotation.y = Math.atan2(move.x, move.z);
+    }
+
+    const grounded = (() => { try { return !!S.api.isGrounded?.(S.target); } catch { return false; } })();
+    if (S.keys.has('Space') && grounded) { S.verticalVelocity = S.jumpSpeed; S.keys.delete('Space'); }
+    S.verticalVelocity -= S.gravity * dt;
+    const dy = S.verticalVelocity * dt;
+    if (typeof S.api.setCharacterVelocity === 'function') {
+      try { S.api.setCharacterVelocity(S.target, new T.Vector3(0, S.verticalVelocity, 0)); } catch {}
+    } else moveObject(new T.Vector3(0, dy, 0));
+    if (grounded && S.verticalVelocity < 0) S.verticalVelocity = 0;
+
+    // Crossing a linked door clears both blue highlights.
+    if (S.doorPair?.length === 2) {
+      const [a, b] = S.doorPair;
+      const near = item => {
+        try { return obj.position.distanceTo(item.object.getWorldPosition(new T.Vector3())) < (item.radius || 1.4); } catch { return false; }
+      };
+      if (near(a) || near(b)) {
+        try { S.api.teleportThroughDoor?.(S.target, a, b); } catch {}
+        clearDoorPair();
+      }
     }
   }
-
-  // Use capture phase so controls are consumed only while possessing a character.
   document.addEventListener('keydown', onKeyDown, true);
   document.addEventListener('keyup', onKeyUp, true);
-  document.addEventListener('pointerdown', event => {
-    if (state.target || !state.api) return;
-    if (event.button === 0 && event.target === state.api.canvas) pickNPC(event);
-  }, true);
-
-  const bridgePoll = setInterval(() => {
-    if (resolveAPI()) clearInterval(bridgePoll);
-  }, 500);
+  document.addEventListener('pointermove', handlePointerMove, true);
+  document.addEventListener('pointerdown', handlePointerDown, true);
+  window.addEventListener('blur', () => S.keys.clear());
+  const poll = setInterval(() => { if (apiReady()) clearInterval(poll); }, 400);
   requestAnimationFrame(tick);
-  setStatus('Waiting for game bridge…');
 })();
