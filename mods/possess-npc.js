@@ -2,9 +2,8 @@
  * Wreckbox — Possess NPC prototype
  * Branch: mod/possess-npc-prototype
  *
- * Prototype/integration adapter, not yet wired to the game's private runtime.
- * The extracted game has an obfuscated inline script, so the actual scene,
- * NPC controller, camera and HUD references must be connected by the game bridge.
+ * Reference prototype only. The active experimental integration now lives in
+ * index.html's inline runtime; see mods/README.md for controls and limitations.
  *
  * Expected bridge:
  * window.wreckboxModAPI = {
