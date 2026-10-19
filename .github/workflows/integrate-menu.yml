@@ -1,0 +1,34 @@
+name: Integrate Update 1.8 map menu
+on:
+  push:
+    branches: [fan-update-1.8]
+    paths:
+      - 'scripts/integrate-menu.mjs'
+      - '.github/workflows/integrate-menu.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fan-update-1.8
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Inject map chooser into the existing game page
+        run: node scripts/integrate-menu.mjs
+      - name: Commit integrated menu
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "No index.html changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Integrate Update 1.8 map chooser into game page"
+          git push origin HEAD:fan-update-1.8
