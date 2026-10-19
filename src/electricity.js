@@ -95,11 +95,20 @@ export class ElectricityNetwork {
   static groupHomes(homes, requestedMax = 4) {
     const max = Math.max(2, Math.min(4, Math.floor(requestedMax) || 4));
     const remaining = (homes || []).filter(h => h && h.id != null && finite(h.x) && finite(h.y));
+    if (!remaining.length) return [];
+
+    // Balance group sizes up front so five homes become 3+2, not 4+1.
+    // A single generated home is the only unavoidable singleton district.
+    const groupCount = Math.ceil(remaining.length / max);
+    const baseSize = Math.floor(remaining.length / groupCount);
+    const largerGroups = remaining.length % groupCount;
     const groups = [];
-    while (remaining.length) {
+
+    for (let groupIndex = 0; groupIndex < groupCount; groupIndex++) {
+      const targetSize = baseSize + (groupIndex < largerGroups ? 1 : 0);
       const seed = remaining.shift();
       const group = [seed];
-      while (group.length < max && remaining.length) {
+      while (group.length < targetSize && remaining.length) {
         let best = 0;
         let bestDistance = Infinity;
         for (let i = 0; i < remaining.length; i++) {
