@@ -20,17 +20,28 @@ export const ATOMGRAD_MATERIALS = Object.freeze({
 });
 
 export const ATOMGRAD_PLANT_LAYOUT = Object.freeze([
-  { id: 'reactor', kind: 'reactor-building', side: 'right', scale: 'huge', destructible: true, shielding: 'reactorConcrete' },
-  { id: 'reactor-core', kind: 'reactor-core', parent: 'reactor', destructible: true, critical: true },
-  { id: 'turbine-hall', kind: 'machine-hall', side: 'right', scale: 'huge', destructible: true },
-  { id: 'generator', kind: 'generator', parent: 'turbine-hall', destructible: true, powerSource: true },
-  { id: 'cooling-loop', kind: 'cooling-system', destructible: true },
-  { id: 'striped-stack', kind: 'striped-stack', side: 'right', scale: 'tall', destructible: true },
-  { id: 'cooling-tower-1', kind: 'cooling-tower', side: 'right', scale: 'huge', destructible: true, steam: true },
-  { id: 'cooling-tower-2', kind: 'cooling-tower', side: 'right', scale: 'huge', destructible: true, steam: true },
-  { id: 'plant-substation', kind: 'substation', side: 'between-city-and-plant', destructible: true },
-  { id: 'transmission-line', kind: 'transmission-line', side: 'between-city-and-plant', destructible: true }
-]);
+  { id: 'reactor', kind: 'reactor-building', x: 0.56, y: 0.62, width: 0.19, height: 0.25, destructible: true, shielding: 'reactorConcrete' },
+  { id: 'reactor-core', kind: 'reactor-core', parent: 'reactor', x: 0.65, y: 0.68, width: 0.045, height: 0.09, destructible: true, critical: true },
+  { id: 'turbine-hall', kind: 'machine-hall', x: 0.12, y: 0.68, width: 0.31, height: 0.22, destructible: true },
+  { id: 'generator', kind: 'generator', parent: 'turbine-hall', x: 0.29, y: 0.76, width: 0.07, height: 0.08, destructible: true, powerSource: true },
+  { id: 'cooling-pumps', kind: 'cooling-pumps', x: 0.44, y: 0.79, width: 0.08, height: 0.09, destructible: true },
+  { id: 'cooling-pipe-main', kind: 'cooling-pipe', x: 0.46, y: 0.87, width: 0.25, height: 0.025, destructible: true, fluidSystem: 'cooling' },
+  { id: 'cooling-loop', kind: 'cooling-system', x: 0.48, y: 0.92, width: 0.21, height: 0.025, destructible: true, fluidSystem: 'cooling' },
+  { id: 'striped-stack', kind: 'striped-stack', x: 0.41, y: 0.28, width: 0.035, height: 0.55, destructible: true },
+  { id: 'cooling-tower-1', kind: 'cooling-tower', x: 0.79, y: 0.55, width: 0.12, height: 0.34, destructible: true, steam: true },
+  { id: 'cooling-tower-2', kind: 'cooling-tower', x: 0.89, y: 0.57, width: 0.09, height: 0.32, destructible: true, steam: true },
+  { id: 'plant-substation', kind: 'substation', x: 0.08, y: 0.82, width: 0.11, height: 0.12, destructible: true },
+  { id: 'switchyard', kind: 'switchyard', x: 0.21, y: 0.49, width: 0.16, height: 0.08, destructible: true },
+  { id: 'transmission-pole-1', kind: 'transmission-pole', x: 0.01, y: 0.45, width: 0.025, height: 0.36, destructible: true },
+  { id: 'transmission-pole-2', kind: 'transmission-pole', x: 0.29, y: 0.43, width: 0.025, height: 0.38, destructible: true },
+  { id: 'transmission-pole-3', kind: 'transmission-pole', x: 0.51, y: 0.44, width: 0.025, height: 0.37, destructible: true },
+  { id: 'control-building', kind: 'control-building', x: 0.74, y: 0.78, width: 0.09, height: 0.12, destructible: true },
+  { id: 'service-building', kind: 'service-building', x: 0.84, y: 0.82, width: 0.08, height: 0.1, destructible: true },
+  { id: 'perimeter-fence-west', kind: 'fence-segment', x: 0.015, y: 0.34, width: 0.015, height: 0.55, destructible: true },
+  { id: 'perimeter-fence-north', kind: 'fence-segment', x: 0.02, y: 0.33, width: 0.96, height: 0.015, destructible: true },
+  { id: 'perimeter-fence-east', kind: 'fence-segment', x: 0.975, y: 0.34, width: 0.015, height: 0.55, destructible: true },
+  { id: 'perimeter-fence-south', kind: 'fence-segment', x: 0.02, y: 0.89, width: 0.96, height: 0.015, destructible: true }
+].map(item => Object.freeze(item)));
 
 export function createAtomgradPlan(seed, worldBounds, options = {}) {
   if (!Number.isInteger(seed)) throw new TypeError('Atomgrad needs a deterministic integer seed');
@@ -47,7 +58,7 @@ export function createAtomgradPlan(seed, worldBounds, options = {}) {
       city: { x: worldBounds.x || 0, width: cityWidth, generator: 'existing-procedural-city', reuseExistingCityGenerator: true },
       plant: { x: (worldBounds.x || 0) + cityWidth, width: plantWidth, generator: 'atomgrad-industrial-layout' }
     },
-    plantStructures: ATOMGRAD_PLANT_LAYOUT.map(item => ({ ...item })),
+    plantStructures: ATOMGRAD_PLANT_LAYOUT.map(item => ({ ...item, x: (worldBounds.x || 0) + cityWidth + item.x * plantWidth, y: (worldBounds.y || 0) + item.y * worldBounds.height, width: item.width * plantWidth, height: item.height * worldBounds.height })),
     cityOptions: { ...(options.cityOptions || {}) },
     rules: {
       ordinaryMapsSpawnPlant: false,
@@ -73,7 +84,6 @@ export function buildAtomgrad(plan, engine) {
   const city = engine.generateCityChunk({ ...plan.regions.city, seed: plan.seed, options: plan.cityOptions });
   const plantObjects = plan.plantStructures.map(structure => engine.spawnStructure({
     ...structure,
-    x: plan.regions.plant.x,
     region: plan.regions.plant,
     destructible: true
   }));
