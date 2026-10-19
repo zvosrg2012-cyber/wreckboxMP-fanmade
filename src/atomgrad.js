@@ -26,16 +26,16 @@ export const ATOMGRAD_MATERIALS = Object.freeze({
 });
 
 export const ATOMGRAD_PLANT_LAYOUT = Object.freeze([
-  { id: 'reactor', kind: 'reactor-building', x: 0.43, y: 0.62, width: 0.22, height: 0.25, destructible: true, shielding: 'reactorConcrete' },
-  { id: 'reactor-core', kind: 'reactor-core', parent: 'reactor', x: 0.52, y: 0.68, width: 0.05, height: 0.09, destructible: true, critical: true },
-  { id: 'turbine-hall', kind: 'machine-hall', x: 0.08, y: 0.68, width: 0.31, height: 0.22, destructible: true },
-  { id: 'generator', kind: 'generator', parent: 'turbine-hall', x: 0.22, y: 0.76, width: 0.07, height: 0.08, destructible: true, powerSource: true },
+  { id: 'reactor', kind: 'reactor-building', x: 0.43, y: 0.62, width: 0.22, height: 0.25, destructible: true, shielding: 'reactorConcrete', color: '#b8b6ad', edgeColor: '#555b60' },
+  { id: 'reactor-core', kind: 'reactor-core', parent: 'reactor', x: 0.52, y: 0.68, width: 0.05, height: 0.09, destructible: true, critical: true, material: 'leadShield', color: '#e85b38', edgeColor: '#76291d' },
+  { id: 'turbine-hall', kind: 'machine-hall', x: 0.08, y: 0.68, width: 0.31, height: 0.22, destructible: true, material: 'structuralSteel', color: '#718c98', edgeColor: '#263943' },
+  { id: 'generator', kind: 'generator', parent: 'turbine-hall', x: 0.22, y: 0.76, width: 0.07, height: 0.08, destructible: true, powerSource: true, material: 'turbinePaint', color: '#4b91c8', edgeColor: '#244b70' },
   { id: 'cooling-pumps', kind: 'cooling-pumps', x: 0.39, y: 0.79, width: 0.07, height: 0.09, destructible: true },
   { id: 'cooling-pipe-main', kind: 'cooling-pipe', x: 0.38, y: 0.87, width: 0.28, height: 0.025, destructible: true, fluidSystem: 'cooling' },
   { id: 'cooling-loop', kind: 'cooling-system', x: 0.38, y: 0.92, width: 0.28, height: 0.025, destructible: true, fluidSystem: 'cooling' },
-  { id: 'striped-stack', kind: 'striped-stack', x: 0.36, y: 0.28, width: 0.035, height: 0.55, destructible: true },
-  { id: 'cooling-tower-1', kind: 'cooling-tower', x: 0.72, y: 0.55, width: 0.12, height: 0.34, destructible: true, steam: true },
-  { id: 'cooling-tower-2', kind: 'cooling-tower', x: 0.86, y: 0.57, width: 0.09, height: 0.32, destructible: true, steam: true },
+  { id: 'striped-stack', kind: 'striped-stack', x: 0.36, y: 0.28, width: 0.035, height: 0.55, destructible: true, material: 'reactorConcrete', color: '#e8e4d9', bands: ['#d94b42', '#f0eee5'], bandCount: 8 },
+  { id: 'cooling-tower-1', kind: 'cooling-tower', x: 0.72, y: 0.55, width: 0.12, height: 0.34, destructible: true, material: 'reactorConcrete', color: '#c2c6c2', edgeColor: '#596568', steam: true },
+  { id: 'cooling-tower-2', kind: 'cooling-tower', x: 0.86, y: 0.57, width: 0.09, height: 0.32, destructible: true, material: 'reactorConcrete', color: '#c2c6c2', edgeColor: '#596568', steam: true },
   { id: 'plant-substation', kind: 'substation', x: 0.08, y: 0.82, width: 0.11, height: 0.12, destructible: true },
   { id: 'switchyard', kind: 'switchyard', x: 0.21, y: 0.49, width: 0.16, height: 0.08, destructible: true },
   { id: 'transmission-pole-1', kind: 'transmission-pole', x: 0.01, y: 0.45, width: 0.025, height: 0.36, destructible: true },
@@ -100,9 +100,11 @@ export function buildAtomgrad(plan, engine) {
   const plantObjects = plan.plantStructures.map(structure => engine.spawnStructure({
     ...structure,
     region: plan.regions.plant,
-    material: structure.shielding || (structure.kind.includes('pipe') ? 'insulatedPipe' : 'structuralSteel'),
-    color: structure.kind === 'striped-stack' ? '#d7d7d2' : (structure.kind.includes('tower') ? '#a8b6b9' : '#788b92'),
-    destructible: true
+    material: structure.material || structure.shielding || (structure.kind.includes('pipe') ? 'insulatedPipe' : 'structuralSteel'),
+    color: structure.color || (structure.kind === 'striped-stack' ? '#e8e4d9' : (structure.kind.includes('tower') ? '#c2c6c2' : '#788b92')),
+    edgeColor: structure.edgeColor || '#34464d',
+    destructible: true,
+    damageModel: { fracturesIntoDebris: true, debrisMaterial: 'radioactiveDebris' }
   }));
   const structureById = new Map(plan.plantStructures.map(structure => [structure.id, structure]));
   const fixtureObjects = (plan.interiorFixtures || []).map((fixture, index) => {
