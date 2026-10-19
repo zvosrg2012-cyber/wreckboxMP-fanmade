@@ -9,6 +9,7 @@
  */
 
 export { ElectricityNetwork } from './electricity.js';
+export { MAP_DEFINITIONS, getMapDefinition, resolveMapSelection, createSelectedMap } from './map-registry.js';
 export {
   ATOMGRAD_MAP_ID,
   ATOMGRAD_MATERIALS,
