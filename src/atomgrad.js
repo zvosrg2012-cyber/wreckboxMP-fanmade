@@ -10,26 +10,32 @@
 export const ATOMGRAD_MAP_ID = 'atomgrad';
 
 export const ATOMGRAD_MATERIALS = Object.freeze({
-  reactorConcrete: { label: 'Защитный бетон', density: 3.2, category: 'building', radiationShield: 0.7 },
-  structuralSteel: { label: 'Конструкционная сталь', density: 7.8, category: 'building', radiationShield: 0.15 },
-  leadShield: { label: 'Свинцовая защита', density: 11.3, category: 'shield', radiationShield: 0.95 },
-  radioactiveDebris: { label: 'Радиоактивные обломки', density: 4.0, category: 'hazard', radioactive: true },
-  sealedShield: { label: 'Герметичная защитная панель', density: 5.0, category: 'shield', radiationShield: 0.9, requiresClosedShell: true },
-  insulatedPipe: { label: 'Изолированная труба', density: 2.2, category: 'industrial' },
-  cableInsulator: { label: 'Изолятор', density: 1.8, category: 'electrical' }
+  reactorConcrete: { label: 'Защитный бетон', density: 3.2, category: 'building', color: '#8d9295', edgeColor: '#555b60', radiationShield: 0.7 },
+  structuralSteel: { label: 'Конструкционная сталь', density: 7.8, category: 'building', color: '#526b78', edgeColor: '#263943', radiationShield: 0.15 },
+  leadShield: { label: 'Свинцовая защита', density: 11.3, category: 'shield', color: '#59666d', edgeColor: '#293238', radiationShield: 0.95 },
+  radioactiveDebris: { label: 'Радиоактивные обломки', density: 4.0, category: 'hazard', color: '#b5a84c', edgeColor: '#514a22', radioactive: true },
+  sealedShield: { label: 'Герметичная защитная панель', density: 5.0, category: 'shield', color: '#b9c7ca', edgeColor: '#5e777e', radiationShield: 0.9, requiresClosedShell: true },
+  insulatedPipe: { label: 'Изолированная труба', density: 2.2, category: 'industrial', color: '#3b9a9b', edgeColor: '#205d62' },
+  cableInsulator: { label: 'Изолятор', density: 1.8, category: 'electrical', color: '#e3e8dc', edgeColor: '#7d8983' },
+  turbinePaint: { label: 'Эмаль турбин', density: 2.4, category: 'industrial', color: '#4b91c8', edgeColor: '#244b70' },
+  safetyPaint: { label: 'Предупреждающая окраска', density: 2.0, category: 'industrial', color: '#e4b44e', edgeColor: '#775322' },
+  brick: { label: 'Красный кирпич', density: 1.9, category: 'building', color: '#a95d49', edgeColor: '#62372f' },
+  plaster: { label: 'Штукатурка', density: 1.4, category: 'interior', color: '#e2d6bd', edgeColor: '#8f816b' },
+  wood: { label: 'Дерево', density: 0.7, category: 'furniture', color: '#9a7048', edgeColor: '#59412c' },
+  glass: { label: 'Стекло', density: 2.5, category: 'building', color: '#79c9e8', edgeColor: '#2c728e' }
 });
 
 export const ATOMGRAD_PLANT_LAYOUT = Object.freeze([
-  { id: 'reactor', kind: 'reactor-building', x: 0.56, y: 0.62, width: 0.19, height: 0.25, destructible: true, shielding: 'reactorConcrete' },
-  { id: 'reactor-core', kind: 'reactor-core', parent: 'reactor', x: 0.65, y: 0.68, width: 0.045, height: 0.09, destructible: true, critical: true },
-  { id: 'turbine-hall', kind: 'machine-hall', x: 0.12, y: 0.68, width: 0.31, height: 0.22, destructible: true },
-  { id: 'generator', kind: 'generator', parent: 'turbine-hall', x: 0.29, y: 0.76, width: 0.07, height: 0.08, destructible: true, powerSource: true },
-  { id: 'cooling-pumps', kind: 'cooling-pumps', x: 0.44, y: 0.79, width: 0.08, height: 0.09, destructible: true },
-  { id: 'cooling-pipe-main', kind: 'cooling-pipe', x: 0.46, y: 0.87, width: 0.25, height: 0.025, destructible: true, fluidSystem: 'cooling' },
-  { id: 'cooling-loop', kind: 'cooling-system', x: 0.48, y: 0.92, width: 0.21, height: 0.025, destructible: true, fluidSystem: 'cooling' },
-  { id: 'striped-stack', kind: 'striped-stack', x: 0.41, y: 0.28, width: 0.035, height: 0.55, destructible: true },
-  { id: 'cooling-tower-1', kind: 'cooling-tower', x: 0.79, y: 0.55, width: 0.12, height: 0.34, destructible: true, steam: true },
-  { id: 'cooling-tower-2', kind: 'cooling-tower', x: 0.89, y: 0.57, width: 0.09, height: 0.32, destructible: true, steam: true },
+  { id: 'reactor', kind: 'reactor-building', x: 0.43, y: 0.62, width: 0.22, height: 0.25, destructible: true, shielding: 'reactorConcrete' },
+  { id: 'reactor-core', kind: 'reactor-core', parent: 'reactor', x: 0.52, y: 0.68, width: 0.05, height: 0.09, destructible: true, critical: true },
+  { id: 'turbine-hall', kind: 'machine-hall', x: 0.08, y: 0.68, width: 0.31, height: 0.22, destructible: true },
+  { id: 'generator', kind: 'generator', parent: 'turbine-hall', x: 0.22, y: 0.76, width: 0.07, height: 0.08, destructible: true, powerSource: true },
+  { id: 'cooling-pumps', kind: 'cooling-pumps', x: 0.39, y: 0.79, width: 0.07, height: 0.09, destructible: true },
+  { id: 'cooling-pipe-main', kind: 'cooling-pipe', x: 0.38, y: 0.87, width: 0.28, height: 0.025, destructible: true, fluidSystem: 'cooling' },
+  { id: 'cooling-loop', kind: 'cooling-system', x: 0.38, y: 0.92, width: 0.28, height: 0.025, destructible: true, fluidSystem: 'cooling' },
+  { id: 'striped-stack', kind: 'striped-stack', x: 0.36, y: 0.28, width: 0.035, height: 0.55, destructible: true },
+  { id: 'cooling-tower-1', kind: 'cooling-tower', x: 0.72, y: 0.55, width: 0.12, height: 0.34, destructible: true, steam: true },
+  { id: 'cooling-tower-2', kind: 'cooling-tower', x: 0.86, y: 0.57, width: 0.09, height: 0.32, destructible: true, steam: true },
   { id: 'plant-substation', kind: 'substation', x: 0.08, y: 0.82, width: 0.11, height: 0.12, destructible: true },
   { id: 'switchyard', kind: 'switchyard', x: 0.21, y: 0.49, width: 0.16, height: 0.08, destructible: true },
   { id: 'transmission-pole-1', kind: 'transmission-pole', x: 0.01, y: 0.45, width: 0.025, height: 0.36, destructible: true },
@@ -48,7 +54,7 @@ export function createAtomgradPlan(seed, worldBounds, options = {}) {
   if (!worldBounds || !Number.isFinite(worldBounds.width) || worldBounds.width < 100) {
     throw new TypeError('Atomgrad needs valid world bounds');
   }
-  const cityWidth = Math.floor(worldBounds.width * 0.62);
+  const cityWidth = Math.floor(worldBounds.width * 0.55);
   const plantWidth = worldBounds.width - cityWidth;
   return {
     id: ATOMGRAD_MAP_ID,
@@ -59,7 +65,16 @@ export function createAtomgradPlan(seed, worldBounds, options = {}) {
       plant: { x: (worldBounds.x || 0) + cityWidth, width: plantWidth, generator: 'atomgrad-industrial-layout' }
     },
     plantStructures: ATOMGRAD_PLANT_LAYOUT.map(item => ({ ...item, x: (worldBounds.x || 0) + cityWidth + item.x * plantWidth, y: (worldBounds.y || 0) + item.y * worldBounds.height, width: item.width * plantWidth, height: item.height * worldBounds.height })),
-    cityOptions: { ...(options.cityOptions || {}) },
+    cityOptions: { ...(options.cityOptions || {}), maxX: (worldBounds.x || 0) + cityWidth, excludePlantRegion: true },
+    interiorFixtures: [
+      { id: 'control-desk', parent: 'control-building', kind: 'control-console', material: 'structuralSteel', color: '#3d8b7d', destructible: true },
+      { id: 'control-screens', parent: 'control-building', kind: 'monitor-bank', material: 'glass', color: '#59c5e7', destructible: true },
+      { id: 'turbine-rotor', parent: 'turbine-hall', kind: 'turbine', material: 'structuralSteel', color: '#a6b6bd', destructible: true },
+      { id: 'generator-coils', parent: 'turbine-hall', kind: 'generator-coils', material: 'turbinePaint', color: '#4b91c8', destructible: true },
+      { id: 'maintenance-crane', parent: 'turbine-hall', kind: 'overhead-crane', material: 'safetyPaint', color: '#e4b44e', destructible: true },
+      { id: 'pipe-valves', parent: 'cooling-pumps', kind: 'valve-bank', material: 'insulatedPipe', color: '#3b9a9b', destructible: true },
+      { id: 'service-workbench', parent: 'service-building', kind: 'workbench', material: 'wood', color: '#9a7048', destructible: true }
+    ].map(item => Object.freeze(item)),
     rules: {
       ordinaryMapsSpawnPlant: false,
       plantOnlyOnAtomgrad: true,
