@@ -45,3 +45,22 @@ test('home grouping uses generated house objects, not hard-coded coordinates', (
   assert.equal(new Set(groups.flat().map(h => h.id)).size, homes.length);
   assert.ok(groups.every(group => group.length >= 1 && group.length <= 4));
 });
+
+test('district grouping avoids a one-house tail whenever multiple homes exist', () => {
+  for (let count = 2; count <= 17; count++) {
+    const homes = Array.from({ length: count }, (_, i) => ({ id: 'home-' + i, x: i * 13, y: (i % 3) * 9 }));
+    const groups = ElectricityNetwork.groupHomes(homes, 4);
+    assert.equal(groups.flat().length, count, 'all homes should be assigned');
+    assert.ok(groups.every(group => group.length >= 2 && group.length <= 4),
+      count + ' homes should form districts of 2-4');
+  }
+  assert.deepEqual(ElectricityNetwork.groupHomes([{ id: 'solo', x: 0, y: 0 }], 4).map(g => g.length), [1]);
+});
+
+test('transformer placement requires an explicit collision-clearance callback', () => {
+  const group = [{ id: 'h1', x: 0, y: 0 }, { id: 'h2', x: 10, y: 0 }];
+  assert.equal(ElectricityNetwork.findTransformerSite(group), null);
+  assert.equal(ElectricityNetwork.findTransformerSite(group, () => false), null);
+  const site = ElectricityNetwork.findTransformerSite(group, point => point.x > 20, 24, 16);
+  assert.ok(site && site.x > 20);
+});
