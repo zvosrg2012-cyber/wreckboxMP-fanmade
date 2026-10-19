@@ -18,6 +18,9 @@ test('Atomgrad is a separate deterministic map with city and plant regions', () 
   assert.ok(plan.plantStructures.some(item => item.id === 'reactor-core' && item.critical));
   assert.ok(plan.plantStructures.every(item => item.destructible));
   assert.ok(plan.plantStructures.length >= 18);
+  assert.ok(plan.regions.city.width / 5000 <= 0.56, 'keep city on the left and reserve the right for the plant');
+  assert.ok(plan.interiorFixtures.some(item => item.kind === 'monitor-bank'));
+  assert.ok(plan.interiorFixtures.some(item => item.kind === 'workbench'));
   assert.ok(new Set(plan.plantStructures.map(item => item.x)).size > 10, 'plant structures need distinct world positions');
 });
 
@@ -40,6 +43,8 @@ test('Atomgrad delegates city generation, destructible structures and radiation 
   assert.equal(result.plantObjects.length, ATOMGRAD_PLANT_LAYOUT.length);
   assert.ok(calls.some(([kind]) => kind === 'radiation'));
   assert.ok(calls.some(([kind]) => kind === 'power'));
+  assert.ok(result.plantObjects.length > ATOMGRAD_PLANT_LAYOUT.length, 'interior fixtures must also be destructible game objects');
+  assert.ok(calls.some(([kind, id]) => kind === 'structure' && id === 'control-screens'));
 });
 
 test('radiation shielding materials are declared and reactor accident advances only on damage events', () => {
