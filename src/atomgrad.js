@@ -104,12 +104,28 @@ export function buildAtomgrad(plan, engine) {
     color: structure.kind === 'striped-stack' ? '#d7d7d2' : (structure.kind.includes('tower') ? '#a8b6b9' : '#788b92'),
     destructible: true
   }));
-  const fixtureObjects = (plan.interiorFixtures || []).map(fixture => engine.spawnStructure({
-    ...fixture,
-    region: plan.regions.plant,
-    destructible: true,
-    interior: true
-  }));
+  const structureById = new Map(plan.plantStructures.map(structure => [structure.id, structure]));
+  const fixtureObjects = (plan.interiorFixtures || []).map((fixture, index) => {
+    const parent = structureById.get(fixture.parent);
+    if (!parent) return null;
+    // Place each interior prop inside its actual parent building, not at an
+    // implicit origin. All positions are world coordinates like plant pieces.
+    const columns = Math.max(1, Math.ceil(Math.sqrt((plan.interiorFixtures || []).length)));
+    const slot = index % columns;
+    const row = Math.floor(index / columns);
+    const x = parent.x + parent.width * (0.2 + 0.6 * ((slot + 0.5) / columns));
+    const y = parent.y + parent.height * (0.35 + 0.5 * ((row % 2) + 0.5));
+    return engine.spawnStructure({
+      ...fixture,
+      x,
+      y,
+      width: Math.max(8, parent.width * 0.16),
+      height: Math.max(8, parent.height * 0.12),
+      region: plan.regions.plant,
+      destructible: true,
+      interior: true
+    });
+  }).filter(Boolean);
   plantObjects.push(...fixtureObjects);
   engine.setPowerSource({ id: 'atomgrad-generator', active: true, objects: plantObjects });
   engine.registerRadiationZone({ id: 'atomgrad-reactor-zone', sourceId: 'reactor-core', enabled: false, radius: 0 });
