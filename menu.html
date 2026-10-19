@@ -3,28 +3,41 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Wreckbox Fan Update 1.8 — меню карт</title>
+<title>Wreckbox Fan Update 1.8</title>
 <style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0,#303b49,#11151b 65%);color:#edf2f7;font:16px system-ui,sans-serif;display:grid;place-items:center;padding:24px}.menu{width:min(760px,100%)}h1{font-size:clamp(28px,5vw,46px);margin:0 0 8px}.sub{color:#b8c4d0;margin:0 0 26px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}.card{border:1px solid #465363;border-radius:12px;background:#1a222c;padding:20px;display:flex;flex-direction:column;gap:12px;min-height:190px}.card h2{margin:0;font-size:21px}.card p{color:#bdc8d3;line-height:1.45;margin:0;flex:1}.go{display:inline-block;text-decoration:none;text-align:center;padding:11px 14px;border-radius:7px;background:#385b7a;color:white;font-weight:650}.go:hover,.go:focus{background:#497aa5}.note{font-size:12px;color:#93a1af;margin-top:18px;line-height:1.5}
+:root{color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#10151c;color:#edf2f7;font:15px system-ui,sans-serif}body{overflow:hidden}.screen{position:absolute;inset:0}.chooser{display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at 50% 0,#303b49,#11151b 68%)}.panel{width:min(760px,100%)}h1{font-size:clamp(28px,5vw,46px);margin:0 0 8px}.sub{color:#b8c4d0;margin:0 0 26px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}.card{border:1px solid #465363;border-radius:12px;background:#1a222c;padding:20px;display:flex;flex-direction:column;gap:12px;min-height:190px}.card h2{margin:0;font-size:21px}.card p{color:#bdc8d3;line-height:1.45;margin:0;flex:1}.go{border:0;cursor:pointer;text-decoration:none;text-align:center;padding:11px 14px;border-radius:7px;background:#385b7a;color:white;font:inherit;font-weight:650}.go:hover,.go:focus{background:#497aa5}.note{font-size:12px;color:#93a1af;margin-top:18px;line-height:1.5}#game{display:none;width:100%;height:100%;border:0;background:#111}#bar{display:none;position:fixed;z-index:10;top:8px;left:8px;gap:7px;flex-wrap:wrap;background:#10151ce8;padding:7px;border:1px solid #465363;border-radius:8px}#bar button{border:1px solid #596575;background:#262e39;color:#fff;border-radius:6px;padding:8px 11px;cursor:pointer}#bar button[aria-pressed=true]{background:#385b7a}
 </style>
 </head>
 <body>
-<main class="menu">
-<h1>Wreckbox Fan Update 1.8</h1>
-<p class="sub">Выбери режим запуска</p>
-<section class="cards" aria-label="Выбор режима">
-<article class="card">
-<h2>Обычная игра</h2>
-<p>Запустить существующую версию игры без отдельной карты Атомград.</p>
-<a class="go" href="./index.html">Играть в Wreckbox</a>
-</article>
-<article class="card">
-<h2>Атомград</h2>
-<p>Отдельная карта-прототип: город, АЭС, трансформатор и тестовые аварийные состояния.</p>
-<a class="go" href="./atomgrad.html">Открыть Атомград</a>
-</article>
-</section>
-<p class="note">Примечание: эта страница — отдельное меню запуска. Атомград пока является визуальным прототипом и не подключён к физике оригинальной игры; выбор здесь не меняет внутренний генератор карт игры.</p>
+<main id="chooser" class="screen chooser">
+ <section class="panel">
+  <h1>Wreckbox Fan Update 1.8</h1>
+  <p class="sub">Выбери карту для запуска</p>
+  <div class="cards">
+   <article class="card"><h2>Обычная игра</h2><p>Запуск оригинальной игры без Атомграда.</p><button class="go" data-open="game">Играть в Wreckbox</button></article>
+   <article class="card"><h2>Атомград</h2><p>Отдельная карта-прототип с городом, АЭС, трансформатором и тестовыми аварийными состояниями.</p><button class="go" data-open="atomgrad">Запустить Атомград</button></article>
+  </div>
+  <p class="note">Атомград сейчас запускается как отдельный прототип. Он ещё не использует физику и генератор оригинальной игры.</p>
+ </section>
 </main>
+<iframe id="game" title="Wreckbox game" allow="fullscreen"></iframe>
+<nav id="bar" aria-label="Переключение карты">
+ <button data-open="menu">← Выбор карты</button><button data-open="game">Обычная игра</button><button data-open="atomgrad">Атомград</button>
+</nav>
+<script>
+(() => {
+ const chooser=document.getElementById('chooser'), frame=document.getElementById('game'), bar=document.getElementById('bar');
+ const routes={game:'./index.html',atomgrad:'./atomgrad.html'};
+ function open(mode){
+  if(mode==='menu'){frame.style.display='none';bar.style.display='none';chooser.style.display='grid';frame.removeAttribute('src');return}
+  if(!routes[mode])return;
+  chooser.style.display='none';frame.style.display='block';bar.style.display='flex';
+  if(frame.getAttribute('src')!==routes[mode])frame.src=routes[mode];
+  bar.querySelectorAll('[data-open]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.open===mode)));
+ }
+ document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>open(b.dataset.open)));
+ if(location.hash==='#game')open('game');else if(location.hash==='#atomgrad')open('atomgrad');
+})();
+</script>
 </body>
 </html>
