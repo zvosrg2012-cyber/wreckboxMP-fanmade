@@ -1,0 +1,15 @@
+name: Update 1.8 tests
+on:
+  push:
+    branches: [fan-update-1.8]
+  pull_request:
+    branches: [fan-update-1.8]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm test
