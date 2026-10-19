@@ -65,6 +65,13 @@ export function createAtomgradPlan(seed, worldBounds, options = {}) {
       plant: { x: (worldBounds.x || 0) + cityWidth, width: plantWidth, generator: 'atomgrad-industrial-layout' }
     },
     plantStructures: ATOMGRAD_PLANT_LAYOUT.map(item => ({ ...item, x: (worldBounds.x || 0) + cityWidth + item.x * plantWidth, y: (worldBounds.y || 0) + item.y * worldBounds.height, width: item.width * plantWidth, height: item.height * worldBounds.height })),
+    // Facade panels are individual destructible bodies, not a single painted rectangle.
+    facadeParts: [
+      ...Array.from({ length: 8 }, (_, i) => ({ id: 'turbine-window-' + i, parent: 'turbine-hall', kind: 'industrial-window', material: 'glass', color: '#79c9e8', edgeColor: '#2c728e', destructible: true, rx: 0.08 + i * 0.12, ry: 0.22, rw: 0.085, rh: 0.18 })),
+      ...Array.from({ length: 5 }, (_, i) => ({ id: 'turbine-floor-' + i, parent: 'turbine-hall', kind: 'catwalk-floor', material: 'structuralSteel', color: '#526b78', edgeColor: '#263943', destructible: true, rx: 0.08 + i * 0.17, ry: 0.57, rw: 0.16, rh: 0.025 })),
+      ...Array.from({ length: 4 }, (_, i) => ({ id: 'control-window-' + i, parent: 'control-building', kind: 'control-window', material: 'glass', color: '#59c5e7', edgeColor: '#2c728e', destructible: true, rx: 0.12 + i * 0.21, ry: 0.2, rw: 0.14, rh: 0.22 })),
+      { id: 'service-door', parent: 'service-building', kind: 'industrial-door', material: 'safetyPaint', color: '#e4b44e', edgeColor: '#775322', destructible: true, rx: 0.42, ry: 0.55, rw: 0.18, rh: 0.4 }
+    ],
     cityOptions: { ...(options.cityOptions || {}), maxX: (worldBounds.x || 0) + cityWidth, excludePlantRegion: true },
     interiorFixtures: [
       { id: 'control-desk', parent: 'control-building', kind: 'control-console', material: 'structuralSteel', color: '#3d8b7d', destructible: true },
@@ -107,6 +114,19 @@ export function buildAtomgrad(plan, engine) {
     damageModel: { fracturesIntoDebris: true, debrisMaterial: 'radioactiveDebris' }
   }));
   const structureById = new Map(plan.plantStructures.map(structure => [structure.id, structure]));
+  const facadeObjects = (plan.facadeParts || []).map(part => {
+    const parent = structureById.get(part.parent);
+    if (!parent) return null;
+    return engine.spawnStructure({
+      id: part.id, kind: part.kind, material: part.material, color: part.color, edgeColor: part.edgeColor,
+      x: parent.x + parent.width * part.rx,
+      y: parent.y + parent.height * part.ry,
+      width: Math.max(6, parent.width * part.rw),
+      height: Math.max(4, parent.height * part.rh),
+      region: plan.regions.plant, destructible: true, damageModel: { fracturesIntoDebris: true }
+    });
+  }).filter(Boolean);
+  plantObjects.push(...facadeObjects);
   const fixtureObjects = (plan.interiorFixtures || []).map((fixture, index) => {
     const parent = structureById.get(fixture.parent);
     if (!parent) return null;
