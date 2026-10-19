@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wreckbox Fan Update 1.8 — Атомград</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#11151b;color:#e8e8e8;font:14px system-ui,sans-serif;overflow:hidden}#hud{position:fixed;z-index:2;left:12px;top:10px;background:#171c24eF;border:1px solid #404956;border-radius:8px;padding:10px 12px;max-width:min(430px,calc(100vw - 24px));box-shadow:0 4px 20px #0008}#hud strong{font-size:16px}#hud p{margin:5px 0 0;color:#c1cad4}#tools{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}button{border:1px solid #596575;background:#262e39;color:white;border-radius:5px;padding:7px 9px;cursor:pointer}button:hover,button:focus{background:#39495b}#world{display:block;width:100vw;height:100vh;touch-action:none}.hint{color:#9eabb9!important;font-size:12px}
+</style>
+</head>
+<body>
+<div id="hud"><strong>Атомград · фан-прототип 1.8</strong><p id="status">Город слева · АЭС справа · электросеть скрыта</p><div id="tools"><button data-action="hut">Разрушить трансформатор</button><button data-action="cooling">Повредить охлаждение</button><button data-action="reactor">Повредить реактор</button><button data-action="reset">Перегенерировать карту</button></div><p class="hint">Это отдельный визуально-интерактивный прототип карты, пока не интегрированный в физику оригинальной игры.</p></div>
+<canvas id="world"></canvas>
+<script>
+(() => {
+const canvas=document.getElementById('world'),ctx=canvas.getContext('2d'),status=document.getElementById('status');
+let seed=Date.now()|0,off=false,cooling=false,core=false,catastrophe=false,buildings=[],particles=[];
+function rng(){seed=(Math.imul(seed,1664525)+1013904223)|0;return (seed>>>0)/4294967296}
+function resize(){canvas.width=Math.floor(innerWidth*devicePixelRatio);canvas.height=Math.floor(innerHeight*devicePixelRatio);ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);draw()}
+function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(x,y,w,h)}
+function line(x,y,x2,y2,c,w=2){ctx.strokeStyle=c;ctx.lineWidth=w;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x2,y2);ctx.stroke()}
+function draw(){
+ const w=innerWidth,h=innerHeight,ground=h*.78;
+ rect(0,0,w,h,'#171b22');
+ // sky glow and distant skyline
+ const sky=ctx.createLinearGradient(0,0,0,ground);sky.addColorStop(0,'#252c37');sky.addColorStop(1,'#4b5052');rect(0,0,w,ground,sky);
+ for(let i=0;i<50;i++){let x=(i*173)%w,y=25+(i*71)%(ground*.5);rect(x,y,2,2,'#a9b9ca')}
+ rect(0,ground,w,h-ground,'#292a29');rect(0,ground,w,5,'#65735a');
+ // city generated from seeded layout, fills left 62 percent
+ buildings.forEach(b=>{rect(b.x,ground-b.h,b.w,b.h,b.color);rect(b.x-2,ground-b.h,b.w+4,4,'#6b6a63');for(let yy=ground-b.h+12;yy<ground-8;yy+=15)for(let xx=b.x+7;xx<b.x+b.w-5;xx+=13)rect(xx,yy,5,7,off?'#292d30':(b.lit?'#f0d990':'#252c32'))});
+ // roads and street lamps
+ rect(0,ground+24,w,36,'#454544');line(0,ground+42,w,ground+42,'#b9ad78',2);
+ for(let x=35;x<w*.61;x+=120){line(x,ground-5,x,ground-36,'#22272a',3);rect(x-6,ground-39,12,5,off?'#343637':'#f7e6a6')}
+ // hidden electrical connections: deliberately draw no wires or graph lines
+ // fenced plant yard
+ const px=w*.64,pw=w*.32;rect(px,ground-4,pw,4,'#8a8d82');
+ for(let x=px;x<px+pw;x+=18){line(x,ground-7,x,ground-30,'#9b9c96',2)}line(px,ground-30,px+pw,ground-30,'#9b9c96',2);
+ // machine hall
+ rect(px+pw*.04,ground-110,pw*.36,110,'#b7b6ae');rect(px+pw*.07,ground-85,pw*.30,25,'#91b5c8');rect(px+pw*.07,ground-48,pw*.3,30,'#777e82');
+ // reactor dome + concrete building
+ const rx=px+pw*.47,rw=pw*.28;rect(rx,ground-142,rw,142,'#c9c8c0');ctx.fillStyle='#d8d6cd';ctx.beginPath();ctx.ellipse(rx+rw/2,ground-142,rw/2,34,0,Math.PI,Math.PI*2);ctx.fill();line(rx,ground-142,rx+rw,ground-142,'#777973',2);
+ rect(rx+rw*.37,ground-98,rw*.26,48,core?'#ff6b35':'#e89b59');
+ // striped stack
+ const sx=px+pw*.42;rect(sx,ground-245,15,245,'#d8d5ca');for(let yy=ground-235;yy<ground;yy+=35)rect(sx,yy,15,15,'#b9483c');
+ // cooling towers with steam
+ for(let i=0;i<2;i++){const tx=px+pw*(.75+i*.16),top=ground-195;ctx.fillStyle='#c9c8bf';ctx.beginPath();ctx.moveTo(tx-28,ground);ctx.lineTo(tx-18,top+20);ctx.quadraticCurveTo(tx,top-12,tx+18,top+20);ctx.lineTo(tx+29,ground);ctx.closePath();ctx.fill();ctx.fillStyle='#ecece8aa';ctx.beginPath();ctx.arc(tx-8,top+2,15,0,Math.PI*2);ctx.arc(tx+12,top-9,19,0,Math.PI*2);ctx.fill();if(cooling){for(let j=0;j<8;j++){ctx.fillStyle='#b8c6d177';ctx.beginPath();ctx.arc(tx+(rng()-.5)*70,top-20-rng()*55,4+rng()*10,0,Math.PI*2);ctx.fill()}}}
+ // transformer hut between town and plant
+ const hx=w*.595,hy=ground-43;rect(hx,hy,40,43,off?'#4a4c4b':'#aaa99f');rect(hx+5,hy+6,30,3,'#656b6c');rect(hx+5,hy+14,30,3,'#656b6c');rect(hx+25,hy+23,3,5,'#e2c46a');ctx.fillStyle='#e3cf48';ctx.beginPath();ctx.moveTo(hx+13,hy+4);ctx.lineTo(hx+7,hy+16);ctx.lineTo(hx+14,hy+16);ctx.lineTo(hx+10,hy+26);ctx.lineTo(hx+23,hy+12);ctx.lineTo(hx+16,hy+12);ctx.fill();
+ if(off){for(let i=0;i<buildings.length;i++)rect(buildings[i].x+4,ground-buildings[i].h+4,buildings[i].w-8,buildings[i].h-8,'#25292b')}
+ if(cooling||core){rect(rx-15,ground-155,rw+30,155,'#5b292044');ctx.fillStyle='#ffb44b';ctx.font='bold 12px system-ui';ctx.fillText(cooling?'ПОВРЕЖДЕНИЕ ОХЛАЖДЕНИЯ':'',rx-15,ground-165)}
+ if(catastrophe){const g=ctx.createRadialGradient(rx+rw/2,ground-150,10,rx+rw/2,ground-150,Math.max(w,h)*.65);g.addColorStop(0,'#fff0a8dd');g.addColorStop(.2,'#ff6b35aa');g.addColorStop(1,'#ff3b2400');rect(0,0,w,h,g);ctx.fillStyle='#fff';ctx.font='bold 24px system-ui';ctx.fillText('АВАРИЯ РЕАКТОРА',w*.38,h*.2)}
+ ctx.fillStyle='#d5d9de';ctx.font='12px system-ui';ctx.fillText('ГОРОД',w*.25,ground+83);ctx.fillText('ПОДСТАНЦИЯ',w*.52,ground+83);ctx.fillText('АЭС',w*.78,ground+83);
+}
+function generate(){seed=(Date.now()^Math.floor(Math.random()*0x7fffffff))|0;off=false;cooling=false;core=false;catastrophe=false;buildings=[];let x=18;while(x<innerWidth*.58){let bw=24+rng()*28,bh=45+rng()*150;buildings.push({x,w:bw,h:bh,color:['#a9a79c','#c0b7a1','#9caaa9','#b8a28d'][Math.floor(rng()*4)],lit:true});x+=bw+5+rng()*12}draw();status.textContent='Город питается от станции · трансформатор цел · скрытая сеть активна'}
+document.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{switch(b.dataset.action){case'hut':off=true;status.textContent='Трансформатор разрушен: район обесточен, окна и фонари погасли';break;case'cooling':cooling=true;status.textContent='Охлаждение повреждено: аварийная стадия активна';break;case'reactor':core=true;if(cooling)catastrophe=true;status.textContent=cooling?'Критическая авария реактора!':'Реактор повреждён: авария развивается';break;case'reset':generate();return}draw()}));
+addEventListener('resize',resize);generate();resize();
+})();
+</script>
+</body></html>
