@@ -17,3 +17,5 @@ for (const term of terms) {
 }
 await writeFile(new URL('../runtime-map-excerpts.md',import.meta.url),out.join('\n'),'utf8');
 console.log('Generated existing map source excerpts.');
+
+// Re-run inspection after workflow installation.
