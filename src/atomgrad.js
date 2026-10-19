@@ -100,8 +100,17 @@ export function buildAtomgrad(plan, engine) {
   const plantObjects = plan.plantStructures.map(structure => engine.spawnStructure({
     ...structure,
     region: plan.regions.plant,
+    material: structure.shielding || (structure.kind.includes('pipe') ? 'insulatedPipe' : 'structuralSteel'),
+    color: structure.kind === 'striped-stack' ? '#d7d7d2' : (structure.kind.includes('tower') ? '#a8b6b9' : '#788b92'),
     destructible: true
   }));
+  const fixtureObjects = (plan.interiorFixtures || []).map(fixture => engine.spawnStructure({
+    ...fixture,
+    region: plan.regions.plant,
+    destructible: true,
+    interior: true
+  }));
+  plantObjects.push(...fixtureObjects);
   engine.setPowerSource({ id: 'atomgrad-generator', active: true, objects: plantObjects });
   engine.registerRadiationZone({ id: 'atomgrad-reactor-zone', sourceId: 'reactor-core', enabled: false, radius: 0 });
   return { city, plantObjects, plan };
