@@ -20,3 +20,5 @@ for (const term of terms) {
 }
 await writeFile(new URL('../runtime-api-report.md',import.meta.url),out.join('\n'),'utf8');
 console.log('Wrote targeted runtime inspection.');
+
+// Trigger inspection after workflow installation.
