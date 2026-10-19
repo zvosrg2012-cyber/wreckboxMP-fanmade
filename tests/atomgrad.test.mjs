@@ -33,7 +33,7 @@ test('Atomgrad delegates city generation, destructible structures and radiation 
   const calls = [];
   const engine = {
     generateCityChunk(options) { calls.push(['city', options]); return { houses: 40 }; },
-    spawnStructure(options) { calls.push(['structure', options.id]); return { id: options.id, destructible: options.destructible }; },
+    spawnStructure(options) { calls.push(['structure', options.id, options]); return { id: options.id, destructible: options.destructible, x: options.x, y: options.y }; },
     registerRadiationZone(options) { calls.push(['radiation', options]); },
     setPowerSource(options) { calls.push(['power', options]); }
   };
@@ -45,6 +45,8 @@ test('Atomgrad delegates city generation, destructible structures and radiation 
   assert.ok(calls.some(([kind]) => kind === 'power'));
   assert.ok(result.plantObjects.length > ATOMGRAD_PLANT_LAYOUT.length, 'interior fixtures must also be destructible game objects');
   assert.ok(calls.some(([kind, id]) => kind === 'structure' && id === 'control-screens'));
+  const placedFixture = calls.find(([kind, id]) => kind === 'structure' && id === 'control-screens')?.[2];
+  assert.ok(Number.isFinite(placedFixture?.x) && Number.isFinite(placedFixture?.y), 'interior fixtures must have actual world coordinates');
 });
 
 test('radiation shielding materials are declared and reactor accident advances only on damage events', () => {
