@@ -36,3 +36,5 @@ import { ElectricityNetwork as Network } from './electricity.js';
 import { createAtomgradPlan as makePlan, buildAtomgrad as buildMap } from './atomgrad.js';
 function requireElectricityNetwork() { return Network; }
 function requireAtomgradApi() { return { createAtomgradPlan: makePlan, buildAtomgrad: buildMap }; }
+
+export { generateSelectedWorld, bindMapSelection } from './map-generator.js';
