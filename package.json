@@ -1,0 +1,8 @@
+{
+  "name": "wreckboxmp-fanmade-update-1-8",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  }
+}
