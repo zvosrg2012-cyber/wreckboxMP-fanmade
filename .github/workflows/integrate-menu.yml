@@ -23,7 +23,7 @@ jobs:
         run: node scripts/integrate-menu.mjs
       - name: Commit cleanup and runtime report
         run: |
-          if git diff --quiet -- index.html runtime-api-report.md; then
+          if [ -z "$(git status --porcelain -- index.html runtime-api-report.md)" ]; then
             echo "No changes needed."
             exit 0
           fi
