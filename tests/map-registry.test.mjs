@@ -25,5 +25,5 @@ test('Atomgrad requires an explicit engine context rather than silently faking o
     seed: 123,
     worldBounds: { x: 0, y: 0, width: 1200, height: 600 },
     engine: {}
-  }), /Engine adapter missing method/);
+  }), /generateCityChunk/);
 });
