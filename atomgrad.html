@@ -9,7 +9,7 @@
 </style>
 </head>
 <body>
-<div id="hud"><strong>Атомград · фан-прототип 1.8</strong><p id="status">Город слева · АЭС справа · электросеть скрыта</p><div id="tools"><button data-action="hut">Разрушить трансформатор</button><button data-action="cooling">Повредить охлаждение</button><button data-action="reactor">Повредить реактор</button><button data-action="reset">Перегенерировать карту</button></div><p class="hint">Это отдельный визуально-интерактивный прототип карты, пока не интегрированный в физику оригинальной игры.</p></div>
+<div id="hud"><strong>Атомград · фан-прототип 1.8</strong><p id="status">Город слева · АЭС справа · электросеть скрыта</p><div id="tools"><button id="backToGameMenu" type="button" onclick="location.href='./index.html'">← В главное меню</button><button data-action="hut">Разрушить трансформатор</button><button data-action="cooling">Повредить охлаждение</button><button data-action="reactor">Повредить реактор</button><button data-action="reset">Перегенерировать карту</button></div><p class="hint">Это отдельный визуально-интерактивный прототип карты, пока не интегрированный в физику оригинальной игры.</p></div>
 <canvas id="world"></canvas>
 <script>
 (() => {
