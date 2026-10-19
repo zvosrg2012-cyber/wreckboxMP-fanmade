@@ -17,6 +17,8 @@ test('Atomgrad is a separate deterministic map with city and plant regions', () 
   assert.equal(plan.regions.city.width + plan.regions.plant.width, 5000);
   assert.ok(plan.plantStructures.some(item => item.id === 'reactor-core' && item.critical));
   assert.ok(plan.plantStructures.every(item => item.destructible));
+  assert.ok(plan.plantStructures.length >= 18);
+  assert.ok(new Set(plan.plantStructures.map(item => item.x)).size > 10, 'plant structures need distinct world positions');
 });
 
 test('Atomgrad refuses to build without real engine adapter methods', () => {
