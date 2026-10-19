@@ -21,6 +21,8 @@ test('Atomgrad is a separate deterministic map with city and plant regions', () 
   assert.ok(plan.regions.city.width / 5000 <= 0.56, 'keep city on the left and reserve the right for the plant');
   assert.ok(plan.interiorFixtures.some(item => item.kind === 'monitor-bank'));
   assert.ok(plan.interiorFixtures.some(item => item.kind === 'workbench'));
+  assert.ok(plan.facadeParts.some(item => item.kind === 'industrial-window'));
+  assert.ok(plan.facadeParts.some(item => item.kind === 'industrial-door'));
   assert.ok(new Set(plan.plantStructures.map(item => item.x)).size > 10, 'plant structures need distinct world positions');
 });
 
@@ -40,7 +42,7 @@ test('Atomgrad delegates city generation, destructible structures and radiation 
   const plan = createAtomgradPlan(7, { x: 0, y: 0, width: 4000, height: 1000 });
   const result = buildAtomgrad(plan, engine);
   assert.equal(result.city.houses, 40);
-  assert.equal(result.plantObjects.length, ATOMGRAD_PLANT_LAYOUT.length);
+  assert.ok(result.plantObjects.length > ATOMGRAD_PLANT_LAYOUT.length);
   assert.ok(calls.some(([kind]) => kind === 'radiation'));
   assert.ok(calls.some(([kind]) => kind === 'power'));
   assert.ok(result.plantObjects.length > ATOMGRAD_PLANT_LAYOUT.length, 'interior fixtures must also be destructible game objects');
