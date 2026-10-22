@@ -16,7 +16,7 @@ html,body{margin:0;min-height:100%;background:#101216;color:#eee;font:16px syste
 (async()=>{
 const status=document.getElementById("status");
 try{
- let html=await(await fetch("./Wreckbox_index.html",{cache:"no-store"})).text();
+ let html=await(await fetch("https://raw.githubusercontent.com/zvosrg2012-cyber/wreckboxMP-fanmade/1.9/Wreckbox_index.html",{cache:"no-store"})).text();
  const re=/<script>\s*\(\(\)=>\{const k=\[([^\]]+)\],s=atob\("([^"]+)"\)/;
  const match=html.match(re);
  if(!match)throw new Error("Не найден исходный скрипт Wreckbox_index.html");
