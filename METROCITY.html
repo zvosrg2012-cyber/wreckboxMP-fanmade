@@ -85,6 +85,61 @@ try{
  let encodedBin="";
  for(let i=0;i<encodedBytes.length;i+=8192)encodedBin+=String.fromCharCode(...encodedBytes.subarray(i,Math.min(i+8192,encodedBytes.length)));
  html=html.replace(match[2],btoa(encodedBin));
+
+ const metroPreview = `<style>
+ #metroCutawayPreview{position:fixed;z-index:2147483000;left:2vw;right:2vw;bottom:10px;height:clamp(210px,35vh,330px);background:#171d22;color:#eef4f6;border:2px solid #829098;box-shadow:0 8px 35px #000c;font:12px system-ui,sans-serif}
+ #metroCutawayPreview .mcpHead{height:31px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:#252f36;font-weight:900;letter-spacing:.09em}
+ #metroCutawayPreview .mcpHead button{background:#394850;color:#fff;border:1px solid #77868d;padding:4px 10px;cursor:pointer}
+ #metroCutawayPreview svg{display:block;width:100%;height:calc(100% - 31px)}
+ #metroCutawayPreview .mcpTrain{animation:mcpTrainGo 9s ease-in-out infinite alternate}
+ @keyframes mcpTrainGo{from{transform:translateX(0)}to{transform:translateX(480px)}}
+ #metroCutawayPreview.mcpClosed{height:31px}
+ #metroCutawayPreview.mcpClosed svg{display:none}
+ @media(max-width:600px){#metroCutawayPreview{left:4px;right:4px;bottom:4px;height:235px}#metroCutawayPreview .mcpHead{font-size:10px;padding:0 6px}}
+ </style>
+ <aside id="metroCutawayPreview" aria-label="Видимый разрез метро под землёй">
+ <div class="mcpHead"><span>МЕТРО-БУНКЕР · ПОД ЗЕМЛЁЙ · 2 СТАНЦИИ / 1 ПОЕЗД</span><button id="mcpToggle" type="button">Свернуть</button></div>
+ <svg viewBox="0 0 1200 300" preserveAspectRatio="xMidYMid meet" role="img" aria-label="В разрезе видны поверхность, слой грунта, лестничные входы, толстые стены бункера, две станции и поезд">
+ <defs>
+  <linearGradient id="mcpSoil" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#786047"/><stop offset="1" stop-color="#332e2a"/></linearGradient>
+  <pattern id="mcpRock" width="42" height="27" patternUnits="userSpaceOnUse"><path d="M4 7l10 -3m13 18l10 -4M18 15l5 -2" stroke="#c9a47a" stroke-width="1.4" opacity=".4"/></pattern>
+  <linearGradient id="mcpTrainBody" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#e3e7e4"/><stop offset="1" stop-color="#7d8c94"/></linearGradient>
+ </defs>
+ <rect width="1200" height="300" fill="url(#mcpSoil)"/><rect width="1200" height="300" fill="url(#mcpRock)"/>
+ <rect y="0" width="1200" height="36" fill="#222a27"/><path d="M0 36H1200" stroke="#8aa568" stroke-width="8"/>
+ <g fill="#67777c" stroke="#aab7ba" stroke-width="2"><rect x="28" y="7" width="74" height="28"/><rect x="112" y="1" width="98" height="34"/><rect x="222" y="12" width="62" height="23"/><rect x="930" y="4" width="84" height="31"/><rect x="1025" y="9" width="64" height="26"/><rect x="1100" y="0" width="72" height="35"/></g>
+ <g fill="#e7ce82"><rect x="38" y="14" width="12" height="9"/><rect x="59" y="14" width="12" height="9"/><rect x="124" y="8" width="14" height="10"/><rect x="148" y="8" width="14" height="10"/><rect x="164" y="8" width="14" height="10"/><rect x="941" y="12" width="14" height="10"/><rect x="963" y="12" width="14" height="10"/></g>
+ <text x="315" y="17" fill="#f3f0e7" font-size="15" font-weight="800">ПОВЕРХНОСТЬ ГОРОДА</text><text x="315" y="30" fill="#bdc9c9" font-size="10">Входы в метро соединены с тоннелем</text>
+ <!-- stair shafts -->
+ <path d="M300 36V60L328 80V122M900 36V60L872 80V122" fill="none" stroke="#aab6bb" stroke-width="15"/><path d="M300 36V60L328 80V122M900 36V60L872 80V122" fill="none" stroke="#48565e" stroke-width="7"/>
+ <g stroke="#d5dfe2" stroke-width="2"><path d="M302 48h13m-13 7h18m-18 7h22m-5 20h17m-13 7h17m-13 7h17m-13 7h17m-13 7h17m-13 7h17"/><path d="M898 48h-13m13 7h-18m18 7h-22m5 20h-17m13 7h-17m13 7h-17m13 7h-17m13 7h-17m13 7h-17"/></g>
+ <!-- thick bunker shell -->
+ <rect x="90" y="116" width="1020" height="160" rx="3" fill="#151d22" stroke="#b5c0c4" stroke-width="18"/>
+ <rect x="108" y="134" width="984" height="124" fill="#26353d" stroke="#56666e" stroke-width="3"/>
+ <g stroke="#71818a" stroke-width="8"><path d="M126 139V253M1074 139V253M126 142H1074"/></g>
+ <!-- station halls -->
+ <rect x="132" y="154" width="275" height="87" fill="#17252c" stroke="#809097" stroke-width="3"/><rect x="793" y="154" width="275" height="87" fill="#17252c" stroke="#809097" stroke-width="3"/>
+ <rect x="143" y="162" width="253" height="7" fill="#e0bf5b"/><rect x="804" y="162" width="253" height="7" fill="#55b8c5"/>
+ <g fill="#f3f5f3" font-size="17" font-weight="900"><text x="153" y="188">СТАНЦИЯ 01</text><text x="814" y="188">СТАНЦИЯ 02</text></g>
+ <g fill="#bac8cd" font-size="10"><text x="153" y="202">ГОРОДСКАЯ ЛИНИЯ</text><text x="814" y="202">БУНКЕРНЫЙ СЕКТОР</text></g>
+ <!-- seats, lights, clock, vending, ventilation -->
+ <g fill="#87969d" stroke="#d7e0e3" stroke-width="1.5"><rect x="155" y="222" width="65" height="6"/><rect x="238" y="222" width="65" height="6"/><rect x="817" y="222" width="65" height="6"/><rect x="900" y="222" width="65" height="6"/></g>
+ <g fill="#ffe6a2"><rect x="177" y="145" width="43" height="4" rx="2"/><rect x="315" y="145" width="43" height="4" rx="2"/><rect x="839" y="145" width="43" height="4" rx="2"/><rect x="977" y="145" width="43" height="4" rx="2"/></g>
+ <circle cx="370" cy="184" r="9" fill="#10171b" stroke="#c9d6db" stroke-width="2"/><path d="M370 184v-5m0 5l4 2" stroke="#dce8eb" stroke-width="2"/><rect x="342" y="197" width="15" height="25" fill="#b9433d" stroke="#e1e6e7"/><rect x="345" y="201" width="9" height="7" fill="#a6e4ef"/>
+ <circle cx="1030" cy="184" r="9" fill="#10171b" stroke="#c9d6db" stroke-width="2"/><path d="M1030 184v-5m0 5l4 2" stroke="#dce8eb" stroke-width="2"/><rect x="1002" y="197" width="15" height="25" fill="#327aa0" stroke="#e1e6e7"/><rect x="1005" y="201" width="9" height="7" fill="#a6e4ef"/>
+ <!-- track and train -->
+ <rect x="407" y="190" width="386" height="51" fill="#0d1419" stroke="#65767e" stroke-width="3"/><path d="M410 217H790M410 231H790" stroke="#c4ced2" stroke-width="3"/>
+ <g stroke="#526168" stroke-width="3"><path d="M423 205v34m24-34v34m24-34v34m24-34v34m24-34v34m24-34v34m24-34v34m24-34v34m24-34v34m24-34v34m24-34v34m24-34v34m24-34v34m24-34v34m24-34v34m24-34v34"/></g>
+ <g class="mcpTrain"><rect x="437" y="195" width="130" height="28" rx="5" fill="url(#mcpTrainBody)" stroke="#edf3f4" stroke-width="2"/><path d="M441 215H563" stroke="#c9473f" stroke-width="3"/><g fill="#315361"><rect x="446" y="201" width="20" height="10"/><rect x="472" y="201" width="20" height="10"/><rect x="498" y="201" width="20" height="10"/><rect x="524" y="201" width="20" height="10"/></g><circle cx="455" cy="225" r="4" fill="#101519" stroke="#aebbc0"/><circle cx="550" cy="225" r="4" fill="#101519" stroke="#aebbc0"/></g>
+ <!-- airtight doors and structural labels -->
+ <g fill="#9aa8ae" stroke="#e0e8ea" stroke-width="2"><rect x="395" y="172" width="11" height="27"/><rect x="794" y="172" width="11" height="27"/></g>
+ <g fill="#ffd56c" font-size="9" font-weight="800"><text x="414" y="179">ГЕРМОДВЕРЬ</text><text x="699" y="179">ГЕРМОДВЕРЬ</text></g>
+ <rect x="470" y="138" width="260" height="10" fill="#56676f" stroke="#aab6bc"/><g stroke="#27363d" stroke-width="3"><path d="M482 140v6m16-6v6m16-6v6m16-6v6m16-6v6m16-6v6m16-6v6m16-6v6m16-6v6m16-6v6m16-6v6m16-6v6m16-6v6m16-6v6m16-6v6"/></g><text x="518" y="132" fill="#d5e0e4" font-size="10">ВЕНТИЛЯЦИЯ / ФИЛЬТРАЦИЯ</text>
+ <text x="600" y="291" text-anchor="middle" fill="#f2f4f3" font-size="12" font-weight="800">ТОЛСТЫЙ ЗАЩИТНЫЙ КОНТУР · ДВЕ СТАНЦИИ · ОДИН ПОЕЗД</text>
+ </svg></aside>
+ <script>(function(){const p=document.getElementById("metroCutawayPreview"),b=document.getElementById("mcpToggle");if(!p||!b)return;b.addEventListener("click",()=>{p.classList.toggle("mcpClosed");b.textContent=p.classList.contains("mcpClosed")?"Показать метро":"Свернуть";});})();</script>`;
+ html=html.replace("</body>",metroPreview+"</body>");
+
  status.hidden=true;
  document.open();document.write(html);document.close();
 }catch(err){
