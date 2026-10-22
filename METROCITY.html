@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wreckbox — МЕТРОСИТИ</title>
+<style>
+html,body{margin:0;min-height:100%;background:#101216;color:#eee;font:16px system-ui,sans-serif}
+#status{position:fixed;z-index:99999;inset:20px auto auto 20px;max-width:620px;padding:14px 18px;border:1px solid #52565d;border-radius:12px;background:#171a1f;color:#f3f0e7;box-shadow:0 8px 32px #0008}
+#status[hidden]{display:none}
+</style>
+</head>
+<body>
+<div id="status">Подготавливаю карту МЕТРОСИТИ из исходной ветки 1.9…</div>
+<script>
+(async()=>{
+const status=document.getElementById("status");
+try{
+ let html=await(await fetch("./Wreckbox_index.html",{cache:"no-store"})).text();
+ const re=/<script>\s*\(\(\)=>\{const k=\[([^\]]+)\],s=atob\("([^"]+)"\)/;
+ const match=html.match(re);
+ if(!match)throw new Error("Не найден исходный скрипт Wreckbox_index.html");
+ const key=match[1].split(",").map(Number);
+ const bin=atob(match[2]),bytes=new Uint8Array(bin.length);
+ for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i)^key[i%key.length]^((i*31+(i>>8))&255);
+ let src=new TextDecoder().decode(bytes);
+ const oldConfig='let Xc="city";const Zc={city:r("Город"),suburb:r("Пригород"),megapolis:r("Мегаполис"),industrial:r("Промзона"),port:r("Порт"),npp:r("Атомград"),base:r("Военная база"),volcano:r("Деревня под вулканом")};let Jc=0,Qc=0;const tf=L?{city:1200,suburb:1200,megapolis:1440,industrial:1200,port:1200,npp:1440,base:1440,volcano:1080}:{city:1440,suburb:1440,megapolis:1920,industrial:1440,port:1440,npp:1680,base:1920,volcano:1200},ef={suburb:{amp:30,ravine:.7,gap:[12,26],street:!1,hills:!0,stations:["hospital","firestation","police","gas"],kinds:[["house",5],["cottage",3],["shop",2],["brick",1],["park",3]]},megapolis:{amp:12,ravine:.5,gap:[10,16],street:!0,hills:!1,stations:["hospital","firestation","police","gas","gas"],kinds:[["sky",5],["office",4],["brick",1],["panel",2],["plaza",1]]},industrial:{amp:18,ravine:.55,gap:[8,16],street:!0,hills:!1,stations:["hospital","firestation","police","gas"],kinds:[["factory",4],["brick",1],["panel",1],["office",1],["yard",2]]},port:{amp:12,ravine:0,gap:[9,16],street:!0,hills:!1,stations:["hospital","firestation","police","gas"],kinds:[["brick",3],["house",2],["shop",2],["office",1],["plaza",1]]},npp:{amp:10,ravine:0,gap:[10,18],street:!0,hills:!1,stations:["hospital","firestation","police","gas"],kinds:[["panel",6],["shop",2],["house",1],["office",1],["plaza",1],["park",2]]},base:{amp:14,ravine:0,gap:[10,18],street:!0,hills:!1,stations:["hospital","firestation","police","gas"],kinds:[["panel",5],["brick",3],["shop",2],["house",1],["plaza",1],["park",2]]}},nf=';
+ const newConfig='let Xc="city";const Zc={city:r("Город"),suburb:r("Пригород"),megapolis:r("Мегаполис"),metrocity:r("МЕТРОСИТИ"),industrial:r("Промзона"),port:r("Порт"),npp:r("Атомград"),base:r("Военная база"),volcano:r("Деревня под вулканом")};let Jc=0,Qc=0;const tf=L?{city:1200,suburb:1200,megapolis:1440,metrocity:1440,industrial:1200,port:1200,npp:1440,base:1440,volcano:1080}:{city:1440,suburb:1440,megapolis:1920,metrocity:1920,industrial:1440,port:1440,npp:1680,base:1920,volcano:1200},ef={suburb:{amp:30,ravine:.7,gap:[12,26],street:!1,hills:!0,stations:["hospital","firestation","police","gas"],kinds:[["house",5],["cottage",3],["shop",2],["brick",1],["park",3]]},megapolis:{amp:12,ravine:.5,gap:[10,16],street:!0,hills:!1,stations:["hospital","firestation","police","gas","gas"],kinds:[["sky",5],["office",4],["brick",1],["panel",2],["plaza",1]]},metrocity:{amp:12,ravine:0,gap:[10,16],street:!0,hills:!1,stations:["hospital","firestation","police","clinic"],kinds:[["sky",5],["office",4],["brick",1],["panel",2],["plaza",1]]},industrial:{amp:18,ravine:.55,gap:[8,16],street:!0,hills:!1,stations:["hospital","firestation","police","gas"],kinds:[["factory",4],["brick",1],["panel",1],["office",1],["yard",2]]},port:{amp:12,ravine:0,gap:[9,16],street:!0,hills:!1,stations:["hospital","firestation","police","gas"],kinds:[["brick",3],["house",2],["shop",2],["office",1],["plaza",1]]},npp:{amp:10,ravine:0,gap:[10,18],street:!0,hills:!1,stations:["hospital","firestation","police","gas"],kinds:[["panel",6],["shop",2],["house",1],["office",1],["plaza",1],["park",2]]},base:{amp:14,ravine:0,gap:[10,18],street:!0,hills:!1,stations:["hospital","firestation","police","gas"],kinds:[["panel",5],["brick",3],["shop",2],["house",1],["plaza",1],["park",2]]}},nf=';
+ if(!src.includes(oldConfig))throw new Error("Не совпала конфигурация генерации карты");
+ src=src.replace(oldConfig,newConfig);
+ const oldAmb='Vv={city:{street:1,crickets:.05,cr:"crickets2",birds:0},megapolis:{street:1.15,crickets:0,cr:"crickets2",birds:0},industrial:';
+ const newAmb='Vv={city:{street:1,crickets:.05,cr:"crickets2",birds:0},megapolis:{street:1.15,crickets:0,cr:"crickets2",birds:0},metrocity:{street:1.15,crickets:0,cr:"crickets2",birds:0},industrial:';
+ if(!src.includes(oldAmb))throw new Error("Не найдены настройки звукового окружения");
+ src=src.replace(oldAmb,newAmb);
+ src=src.replace('("megapolis"===Xc?1.3:1)','(("megapolis"===Xc||"metrocity"===Xc)?1.3:1)');
+ const oldGen='af(e,u,n),e.street&&rf()}finally{Math.random=n}}(Xc):function(){';
+ const newGen='af(e,u,n),"metrocity"===t&&MetroCityUnderground(),e.street&&rf()}finally{Math.random=n}}(Xc):function(){';
+ if(!src.includes(oldGen))throw new Error("Не найден участок процедурной генерации");
+ src=src.replace(oldGen,newGen);
+ const anchor='function rf(){for(let t=0;t<u;){let e=t;for(;e+1<u&&At[e+1]===At[t];)e++;if(e-t>=9)';
+ const helper=[
+ 'function MetroCityUnderground(){',
+ ' const x0=Math.round(u*.18),x1=Math.round(u*.82),top=p+7,floor=Math.min(d-5,p+29);',
+ ' if(x1-x0<220||floor>=d-4)return;',
+ ' ec(x0+3,top+3,x1-3,floor-3);',
+ ' tc(x0,top,x1,top+2,3,0,1);tc(x0,floor-2,x1,floor,3,0,1);',
+ ' tc(x0,top,x0+2,floor,3,0,1);tc(x1-2,top,x1,floor,3,0,1);',
+ ' for(let x=x0+8;x<x1-4;x+=12)tc(x,top+3,x+1,top+3,4,0,1);',
+ ' for(let x=x0+4;x<x1-4;x+=4)tc(x,floor-4,x+1,floor-4,4,0,1);',
+ ' tc(x0+4,floor-5,x1-4,floor-5,4,0,1);',
+ ' tc(x0+8,floor-7,x0+62,floor-6,3,0,1);tc(x1-62,floor-7,x1-8,floor-6,3,0,1);',
+ ' const mid=Math.round((x0+x1)/2);',
+ ' tc(mid-22,floor-13,mid+22,floor-6,4,0,1);',
+ ' tc(mid-19,floor-12,mid-13,floor-10,5,0,1);tc(mid-10,floor-12,mid-4,floor-10,5,0,1);',
+ ' tc(mid+3,floor-12,mid+9,floor-10,5,0,1);tc(mid+12,floor-12,mid+18,floor-10,5,0,1);',
+ ' ql("bench",6*(x0+27),6*(floor-7));ql("bench",6*(x1-27),6*(floor-7));',
+ ' ql("vending",6*(x0+52),6*(floor-7));ql("vending",6*(x1-52),6*(floor-7));',
+ ' for(let x=x0+14;x<x1-12;x+=24)Ul("clamp",6*x,top+2,2);',
+ ' const lots=jl.filter(v=>Number.isFinite(v.x0)&&Number.isFinite(v.x1)&&v.x1>=0&&v.x0<u).sort((a,b)=>a.x0-b.x0);',
+ ' function findGap(target){let best=null,dist=1e9;for(let i=0;i<lots.length-1;i++){const left=lots[i],right=lots[i+1],lo=Math.max(8,left.x1+2),hi=Math.min(u-8,right.x0-2);if(hi-lo<7)continue;const x=Math.round((lo+hi)/2),delta=Math.abs(x-target);if(delta<dist){best=x;dist=delta}}return best!==null&&dist<100?best:null}',
+ ' for(const target of [x0+20,x1-20]){const ex=findGap(target);if(ex===null)continue;const ground=At[ex];tc(ex-3,ground-9,ex+3,ground-8,4,0,1);tc(ex-3,ground-8,ex-2,ground-1,3,0,1);tc(ex+2,ground-8,ex+3,ground-1,3,0,1);tc(ex-1,ground-7,ex+1,ground-7,5,0,1);tc(ex-1,ground-5,ex+1,ground-5,5,0,1);ql("slamp",6*ex,6*(ground-2))}',
+ '}'
+ ].join("\n");
+ if(!src.includes(anchor))throw new Error("Не найдено место для генератора метро");
+ src=src.replace(anchor,helper+anchor);
+ const encodedBytes=new TextEncoder().encode(src);
+ for(let i=0;i<encodedBytes.length;i++)encodedBytes[i]^=key[i%key.length]^((i*31+(i>>8))&255);
+ let encodedBin="";
+ for(let i=0;i<encodedBytes.length;i+=8192)encodedBin+=String.fromCharCode(...encodedBytes.subarray(i,Math.min(i+8192,encodedBytes.length)));
+ html=html.replace(match[2],btoa(encodedBin));
+ status.hidden=true;
+ document.open();document.write(html);document.close();
+}catch(err){
+ status.textContent="Не удалось подготовить МЕТРОСИТИ: "+(err&&err.message||String(err))+". Откройте файл через веб-сервер, чтобы он мог загрузить Wreckbox_index.html.";
+}
+})();
+</script>
+</body>
+</html>
