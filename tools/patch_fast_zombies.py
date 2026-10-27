@@ -45,6 +45,14 @@ replacements = [
         b'n.gone||n.hidden||n.zomb||n.bit||n.dead&&!n.rag',
         b'n.gone||n.hidden||n.zomb&&(!n.zomb.type||n.zomb.type===t.zomb.type)||n.bit||n.dead&&!n.rag',
     ),
+    (
+        b'if(O<=0)return void px(t,t.vx,-12,B(-.4,.4));',
+        b'if(O<=0&&!t.zomb)return void px(t,t.vx,-12,B(-.4,.4));',
+    ),
+    (
+        b't.onGround?t.vx+=(n*t.dir-t.vx)*Math.min(1,10*e):t.vx*=1-.3*e',
+        b't.onGround||t.zomb?t.vx+=(n*t.dir-t.vx)*Math.min(1,10*e):t.vx*=1-.3*e',
+    ),
 ]
 for old, new in replacements:
     if old not in src:
