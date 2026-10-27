@@ -1,0 +1,62 @@
+name: Patch zombie AI in 1.9.2
+
+on:
+  push:
+    branches:
+      - "1.9.2"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-zombie-ai:
+    if: github.event.head_commit.message != 'Fix zombie AI movement in 1.9.2'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out 1.9.2
+        uses: actions/checkout@v4
+        with:
+          ref: "1.9.2"
+          persist-credentials: true
+      - name: Patch the game's embedded source
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const file = 'index.html';
+          const html = fs.readFileSync(file, 'utf8');
+          const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)];
+          if (scripts.length < 4) throw new Error('Could not locate embedded game source');
+          const wrapper = scripts[3][1];
+          const match = wrapper.match(/s=atob\\("([^"]+)"\\)/);
+          if (!match) throw new Error('Could not locate encrypted game source');
+          const key = [217,79,17,213,195,83,252,177,26,207,191,21,215,35,226,190,52,67,203,138,197,141,217,255];
+          const decodedBytes = Buffer.from(match[1], 'base64');
+          for (let i = 0; i < decodedBytes.length; i++) decodedBytes[i] ^= key[i % key.length] ^ ((i * 31 + (i >> 8)) & 255);
+          let decoded = decodedBytes.toString('latin1');
+          const oldGuard = 'if(O<=0)return void px(t,t.vx,-12,B(-.4,.4));';
+          const newGuard = 'if(O<=0&&!t.zomb)return void px(t,t.vx,-12,B(-.4,.4));';
+          const oldMove = 't.onGround?t.vx+=(n*t.dir-t.vx)*Math.min(1,10*e):t.vx*=1-.3*e';
+          const newMove = 't.onGround||t.zomb?t.vx+=(n*t.dir-t.vx)*Math.min(1,10*e):t.vx*=1-.3*e';
+          if (decoded.includes(newGuard) && decoded.includes(newMove)) {
+            console.log('Zombie movement patch is already present.');
+            process.exit(0);
+          }
+          if (!decoded.includes(oldGuard) || !decoded.includes(oldMove)) throw new Error('Expected zombie movement code not found; no file changed');
+          decoded = decoded.replace(oldGuard, newGuard).replace(oldMove, newMove);
+          const output = Buffer.from(decoded, 'latin1');
+          for (let i = 0; i < output.length; i++) output[i] ^= key[i % key.length] ^ ((i * 31 + (i >> 8)) & 255);
+          const patchedWrapper = wrapper.replace(match[0], 's=atob("' + output.toString('base64') + '")');
+          const patchedHtml = html.replace(wrapper, patchedWrapper);
+          fs.writeFileSync(file, patchedHtml);
+          console.log('Patched actual index.html game source.');
+          NODE
+      - name: Commit the game source fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix zombie AI movement in 1.9.2"
+          git push origin HEAD:1.9.2
