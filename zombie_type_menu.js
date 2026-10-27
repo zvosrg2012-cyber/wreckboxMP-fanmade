@@ -28,12 +28,19 @@
   const style = document.createElement("style");
   style.textContent = `
     #zombieTypeMenu {
+      position: fixed;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 2147483000;
       box-sizing: border-box;
-      width: 100%;
-      max-width: 100%;
+      width: min(210px, calc(100vw - 24px));
+      max-width: calc(100vw - 24px);
       min-width: 0;
-      overflow: hidden;
-      margin-top: 10px;
+      max-height: 78vh;
+      overflow-x: hidden;
+      overflow-y: auto;
+      margin: 0;
       padding: 10px;
       background: linear-gradient(var(--room, #171a1f), var(--room2, #101216));
       border: 1px solid var(--line, rgba(255,255,255,.1));
@@ -114,7 +121,7 @@
       line-height: 1.4;
     }
     @media (max-width: 520px) {
-      #zombieTypeMenu { padding: 8px; }
+      #zombieTypeMenu { left: 6px; width: min(180px, calc(100vw - 12px)); max-width: calc(100vw - 12px); padding: 8px; }
       #zombieTypeMenu button { min-height: 32px; padding: 6px; font-size: 12px; }
     }
   `;
@@ -148,7 +155,7 @@
       if (panel) panel.remove();
       return;
     }
-    if (!panel || panel.parentElement !== options) {
+    if (!panel || panel.parentElement !== document.body) {
       if (panel) panel.remove();
       panel = document.createElement("section");
       panel.id = "zombieTypeMenu";
@@ -172,7 +179,7 @@
         });
         grid.appendChild(button);
       });
-      options.appendChild(panel);
+      document.body.appendChild(panel);
     }
     update(panel);
   }
