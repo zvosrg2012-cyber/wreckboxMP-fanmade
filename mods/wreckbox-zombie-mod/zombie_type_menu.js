@@ -31,7 +31,7 @@
   const style = document.createElement('style');
   style.textContent = [
     '#wzmStatus{position:fixed;z-index:2147483000;right:10px;top:50%;transform:translateY(-50%);writing-mode:vertical-rl;max-height:80vh;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:12px 7px;border:1px solid #59c783;border-radius:8px;background:rgba(13,35,24,.94);color:#b8ffd0;box-shadow:0 4px 18px rgba(0,0,0,.35);font:800 11px/1.2 system-ui,sans-serif;letter-spacing:.08em;pointer-events:none;box-sizing:border-box}',
-    '#wzmPanel{box-sizing:border-box;width:100%;max-width:100%;min-width:0;overflow:hidden;margin-top:10px;padding:10px;background:linear-gradient(var(--room,#171a1f),var(--room2,#101216));border:1px solid var(--line,rgba(255,255,255,.12));color:var(--ink,#f3f0e7)}',
+    '#wzmPanel{position:fixed;left:12px;top:50%;transform:translateY(-50%);z-index:2147483000;box-sizing:border-box;width:min(210px,calc(100vw - 24px));max-width:calc(100vw - 24px);min-width:0;max-height:78vh;overflow-x:hidden;overflow-y:auto;margin:0;padding:10px;background:linear-gradient(var(--room,#171a1f),var(--room2,#101216));border:1px solid var(--line,rgba(255,255,255,.12));color:var(--ink,#f3f0e7)}',
     '#wzmPanel *,#wzmPanel *::before,#wzmPanel *::after{box-sizing:border-box;min-width:0}',
     '#wzmPanel .wzm-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;max-width:100%;margin-bottom:8px;color:var(--ink-dim,#a9aaa6);font:700 12px/1.2 var(--font-ui,system-ui);letter-spacing:.1em;text-transform:uppercase}',
     '#wzmPanel .wzm-head span{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
@@ -41,7 +41,7 @@
     '#wzmPanel button[data-zombie-type="fast"][aria-pressed="true"]{border-color:#f04452;background:rgba(181,31,43,.24);color:#ff7b85}',
     '#wzmPanel button[aria-pressed=true]:not([data-zombie-type="fast"]){border-color:var(--accent,#ffc21a);background:rgba(255,194,26,.13);color:var(--accent,#ffc21a)}',
     '#wzmPanel .wzm-note{display:-webkit-box;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;max-height:2.8em;margin:8px 0 0;color:var(--ink-faint,#a4a4a4);font-size:11px;line-height:1.4;overflow-wrap:anywhere}',
-    '@media(max-width:520px){#wzmStatus{right:3px;font-size:9px;padding:9px 5px}#wzmPanel{padding:8px}#wzmPanel button{min-height:32px;padding:6px;font-size:12px}}'
+    '@media(max-width:520px){#wzmStatus{right:3px;font-size:9px;padding:9px 5px}#wzmPanel{left:6px;width:min(180px,calc(100vw - 12px));max-width:calc(100vw - 12px);padding:8px}#wzmPanel button{min-height:32px;padding:6px;font-size:12px}}'
   ].join('');
   document.head.appendChild(style);
 
@@ -88,7 +88,7 @@
       return;
     }
     status.title = 'Мод активен; меню выбора зомби подключено.';
-    if (!panel || panel.parentElement !== options) {
+    if (!panel || panel.parentElement !== document.body) {
       if (panel) panel.remove();
       panel = document.createElement('section');
       panel.id = 'wzmPanel';
@@ -114,7 +114,7 @@
         });
         grid.appendChild(button);
       });
-      options.appendChild(panel);
+      document.body.appendChild(panel);
     }
     updateSelection(panel);
   }
