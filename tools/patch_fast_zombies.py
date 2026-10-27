@@ -55,6 +55,8 @@ replacements = [
     ),
 ]
 for old, new in replacements:
+    if new in src:
+        continue
     if old not in src:
         raise SystemExit("Patch anchor missing; refusing to change index.html: " + old[:60].decode())
     src = src.replace(old, new, 1)
