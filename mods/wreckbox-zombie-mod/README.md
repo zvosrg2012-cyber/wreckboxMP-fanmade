@@ -2,23 +2,29 @@
 
 Windows/local HTML prototype for branch `1.9.2`.
 
-## Install
+## Fix zombies standing idle (core patch)
+
+The game core is embedded in `index.html` in an XOR-obfuscated form. `patch_zombie_ai.py` edits that embedded core directly; it does **not** inject another runtime script.
+
+1. Make sure Python 3 is installed.
+2. Copy `mods/wreckbox-zombie-mod/patch_zombie_ai.py` into the game root next to `index.html`.
+3. Open a terminal in that folder and run:
+   `python patch_zombie_ai.py index.html`
+4. Restart the game and test the Zombie tool in a new scene.
+
+The patch makes the core reactivate the zombie AI controller when a zombie is idle and has lost its zombie action. It creates `index.html.before-zombie-ai-patch` first and leaves the file unchanged if the expected 1.9.2 code marker is missing. This patch has not been tested in a running browser/game session yet.
+
+## Install the menu (optional)
+
 1. Keep the game's files in place; `index.html` must be in the game root.
 2. Copy this entire folder to `<game>\\mods\\wreckbox-zombie-mod\\`.
 3. Run `install_mod.bat`, then restart the game normally.
 
-The installer makes a timestamped backup of `index.html`, then adds a script tag for this mod. It does not download anything or launch an external engine.
-
-## Uninstall
-Run `uninstall_mod.bat`. It restores the newest backup made by the installer. Do not do this after making other edits to the game, because those later edits would be lost.
+The installer makes a timestamped backup of `index.html`, then adds a script tag for the menu mod.
 
 ## Current behavior and limitations
-- The side badge confirms the script loaded.
-- The menu uses the existing `#tools` and `#optExtra` hooks.
-- Menu text is constrained with ellipsis/line clamping so long labels should not stretch the options panel.
-- Choosing a type sets `window.__WRECKBOX_SELECTED_ZOMBIE_TYPE__`, exposes its config as `window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__`, and dispatches `wzm:zombie-type-change`.
-- The Fast config requests speed multiplier `1.75`, red body color, blue eyes glowing in darkness, a bloodier visual flag, and hostility to other zombie types.
-- **Those config values do not change NPCs by themselves.** The game’s NPC/spawn/render/combat code must read the config or handle the `wzm:zombie-type-change` event. The current mod script does not invent or patch unknown game APIs, so actual speed, body/eye visuals, blood effects, and faction combat still require a compatible game-side integration.
+
+- The menu uses the existing `#tools` and `#optExtra` hooks and sits on the left.
+- Selecting a type currently stores a config and dispatches `wzm:zombie-type-change`; it does not yet apply fast-zombie color, glowing blue eyes, blood effects, or hostility between zombie types to the game core.
 - Heavy and Hunter remain placeholders.
-- Future game versions may change the HTML hooks.
-- Source inspection only; this has not been launched on the user's Windows computer.
+- Source patching is specific to the current 1.9.2 core structure. Back up the game before running it.
