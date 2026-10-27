@@ -34,6 +34,12 @@
   status.setAttribute('aria-label', 'Мод Wreckbox Zombie Menu активен');
   document.body.appendChild(status);
 
+  function findZombieTool(tools) {
+    const buttons = Array.from(tools.querySelectorAll('.tool'));
+    return buttons.find(button => /зомби|zombie/i.test(button.textContent || '') ||
+      /zombie/i.test(button.getAttribute('data-tool') || '')) || null;
+  }
+
   function updateSelection(panel) {
     panel.querySelectorAll('[data-zombie-type]').forEach(button => {
       button.setAttribute('aria-pressed', String(button.dataset.zombieType === selectedType));
@@ -50,15 +56,20 @@
     const options = document.getElementById('optExtra');
     const tools = document.getElementById('tools');
     if (!options || !tools) {
-      status.title = 'Скрипт загружен, но элементы меню 1.9.2 не найдены.';
+      status.title = 'Скрипт загружен, но элементы меню игры не найдены.';
       return;
     }
-    const zombieActive = !!tools.querySelector('.tool.on[data-tool="zombie"]');
+    const zombieTool = findZombieTool(tools);
+    const zombieActive = !!zombieTool && zombieTool.classList.contains('on');
     let panel = document.getElementById('wzmPanel');
     if (!zombieActive) {
       if (panel) panel.remove();
+      status.title = zombieTool
+        ? 'Мод активен. Выберите существующий элемент зомби, чтобы открыть меню.'
+        : 'Мод загружен, но кнопка зомби не найдена среди инструментов.';
       return;
     }
+    status.title = 'Мод активен; меню выбора зомби подключено.';
     if (!panel || panel.parentElement !== options) {
       if (panel) panel.remove();
       panel = document.createElement('section');
