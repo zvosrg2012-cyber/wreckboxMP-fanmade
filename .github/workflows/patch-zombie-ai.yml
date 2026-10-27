@@ -26,10 +26,10 @@ jobs:
           const fs = require('fs');
           const file = 'index.html';
           const html = fs.readFileSync(file, 'utf8');
-          const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)];
+          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
           if (scripts.length < 4) throw new Error('Could not locate embedded game source');
           const wrapper = scripts[3][1];
-          const match = wrapper.match(/s=atob\\("([^"]+)"\\)/);
+          const match = wrapper.match(/s=atob\("([^"]+)"\)/);
           if (!match) throw new Error('Could not locate encrypted game source');
           const key = [217,79,17,213,195,83,252,177,26,207,191,21,215,35,226,190,52,67,203,138,197,141,217,255];
           const decodedBytes = Buffer.from(match[1], 'base64');
