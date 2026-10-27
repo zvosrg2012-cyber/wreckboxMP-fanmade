@@ -18,3 +18,17 @@ Run `uninstall_mod.bat`. It restores the newest backup made by the installer. Do
 - Standard is the only type with implemented gameplay behavior. Fast, Heavy, and Hunter are selectable UI placeholders only; they do not change NPC stats or behavior yet.
 - Future game versions may change the HTML hooks.
 - Source inspection only; this has not been launched on the user's Windows computer.
+
+
+## Freeze-hardening update
+
+The `fix/zombie-menu-freeze` branch includes a defensive rewrite of both copies of
+`zombie_type_menu.js`:
+
+- coalesces repeated DOM notifications into one animation-frame render;
+- prevents duplicate initialization if the script is included twice;
+- observes only direct child changes inside the options panel, not every nested menu mutation;
+- catches render errors and reports them to the console;
+- keeps Fast, Heavy, and Hunter as UI placeholders, without claiming their gameplay effects exist.
+
+This update passed a JavaScript syntax check, but it has **not** been runtime-tested inside WreckboxMP 1.9.3. The branch is based on the repository's 1.9.2 source; test it on a backup before using it in a different game build.
