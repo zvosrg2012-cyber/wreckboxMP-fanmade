@@ -1,111 +1,158 @@
-/* Integrated Wreckbox zombie-type panel.
-   Loaded by index.html; uses the existing Zombie tool and its #optExtra panel.
-   No separate game loop or external software is started. */
+/* WreckboxMP zombie menu — guarded and throttled version. */
 (() => {
-  "use strict";
+  'use strict';
+  if (window.__WRECKBOX_ZOMBIE_MOD_LOADED__) return;
+  window.__WRECKBOX_ZOMBIE_MOD_LOADED__ = true;
 
-  const style = document.createElement("style");
-  style.textContent = `
-    #zombieTypeMenu {
-      margin-top: 10px;
-      padding: 10px;
-      background: linear-gradient(var(--room, #171a1f), var(--room2, #101216));
-      border: 1px solid var(--line, rgba(255,255,255,.1));
-      box-shadow: inset 0 0 0 1px rgba(0,0,0,.35);
-    }
-    #zombieTypeMenu .zt-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 8px;
-      color: var(--ink-dim);
-      font: 700 12px/1.2 var(--font-ui);
-      letter-spacing: .12em;
-      text-transform: uppercase;
-    }
-    #zombieTypeMenu .zt-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 6px;
-    }
-    #zombieTypeMenu button {
-      min-height: 36px;
-      padding: 7px 9px;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,.035);
-      color: var(--ink);
-      text-align: left;
-      font: 600 13px/1.2 var(--font-ui);
-      cursor: pointer;
-    }
-    #zombieTypeMenu button[aria-pressed="true"] {
-      border-color: var(--accent);
-      background: rgba(255,194,26,.13);
-      color: var(--accent);
-    }
-    #zombieTypeMenu button:disabled {
-      opacity: .48;
-      cursor: not-allowed;
-    }
-    #zombieTypeMenu .zt-note {
-      margin: 8px 0 0;
-      color: var(--ink-faint);
-      font-size: 11px;
-      line-height: 1.35;
-    }
-    @media (max-width: 520px) {
-      #zombieTypeMenu { padding: 8px; }
-      #zombieTypeMenu button { min-height: 32px; padding: 6px; font-size: 12px; }
-    }
-  `;
-  document.head.appendChild(style);
+  const types = [
+    { id: 'standard', label: 'Обычный', note: 'Стандартный тип игры.' },
+    { id: 'fast', label: 'Быстрый', note: 'Скорость пока не меняется.' },
+    { id: 'heavy', label: 'Тяжёлый', note: 'Прочность пока не меняется.' },
+    { id: 'hunter', label: 'Охотник', note: 'Поведение пока не меняется.' }
+  ];
+  let selected = 'standard';
+  let observer;
+  let bootObserver;
+  let queued = false;
+  let status;
 
-  function init() {
-    const options = document.getElementById("optExtra");
-    const tools = document.getElementById("tools");
-    if (!options || !tools) return false;
+  const nextFrame = window.requestAnimationFrame
+    ? window.requestAnimationFrame.bind(window)
+    : fn => window.setTimeout(fn, 0);
 
-    function render() {
-      const zombieActive = !!tools.querySelector('.tool.on[data-tool="zombie"]');
-      let panel = document.getElementById("zombieTypeMenu");
-
-      if (!zombieActive) {
-        if (panel) panel.remove();
-        return;
-      }
-      if (panel && panel.parentElement === options) return;
-      if (panel) panel.remove();
-
-      panel = document.createElement("section");
-      panel.id = "zombieTypeMenu";
-      panel.setAttribute("aria-label", "Выбор вида зомби");
-      panel.innerHTML = `
-        <div class="zt-head"><span>Вид зомби</span><span>1 доступен</span></div>
-        <div class="zt-grid" role="group" aria-label="Виды зомби">
-          <button type="button" data-zombie-type="standard" aria-pressed="true">Обычный</button>
-          <button type="button" disabled aria-disabled="true">Быстрый · позже</button>
-          <button type="button" disabled aria-disabled="true">Тяжёлый · позже</button>
-          <button type="button" disabled aria-disabled="true">Охотник · позже</button>
-        </div>
-        <p class="zt-note">Сейчас работает стандартный вид. Новые виды и их поведение добавим отдельно.</p>
-      `;
-      options.appendChild(panel);
+  function ensureUi() {
+    if (!document.getElementById('wzmStyle')) {
+      const style = document.createElement('style');
+      style.id = 'wzmStyle';
+      style.textContent = '#wzmStatus{position:fixed;z-index:2147483000;right:10px;top:50%;transform:translateY(-50%);writing-mode:vertical-rl;padding:10px 7px;border:1px solid #59c783;border-radius:8px;background:rgba(13,35,24,.94);color:#b8ffd0;font:800 11px/1.2 system-ui,sans-serif;pointer-events:none}#wzmPanel{margin-top:10px;padding:10px;background:var(--room,#171a1f);border:1px solid var(--line,rgba(255,255,255,.12));color:var(--ink,#f3f0e7)}#wzmPanel .wzm-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}#wzmPanel button{min-height:34px;padding:7px;border:1px solid var(--line,#454950);background:rgba(255,255,255,.035);color:var(--ink,#f3f0e7);text-align:left;cursor:pointer}#wzmPanel button[aria-pressed=true]{border-color:var(--accent,#ffc21a);color:var(--accent,#ffc21a)}#wzmPanel .wzm-note{font-size:11px;line-height:1.4}';
+      (document.head || document.documentElement).appendChild(style);
     }
-
-    const observer = new MutationObserver(render);
-    observer.observe(options, { childList: true, subtree: true });
-    observer.observe(tools, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["class", "data-tool"]
-    });
-    render();
-    return true;
+    status = document.getElementById('wzmStatus');
+    if (!status && document.body) {
+      status = document.createElement('div');
+      status.id = 'wzmStatus';
+      status.textContent = 'МОД АКТИВЕН';
+      status.title = 'Скрипт загружен; проверяется интерфейс игры.';
+      document.body.appendChild(status);
+    }
   }
 
-  if (!init()) {
-    document.addEventListener("DOMContentLoaded", init, { once: true });
+  function findZombieTool(tools) {
+    const exact = tools.querySelector('[data-tool="zombie"]');
+    if (exact) return exact;
+    for (const el of tools.querySelectorAll('button,[role="button"],.tool')) {
+      if (/зомби|zombie/i.test(el.textContent || '') ||
+          /zombie/i.test(el.getAttribute('data-tool') || '')) return el;
+    }
+    return null;
+  }
+
+  function active(el) {
+    return !!el && (el.classList.contains('on') ||
+      el.getAttribute('aria-pressed') === 'true' ||
+      el.getAttribute('aria-selected') === 'true');
+  }
+
+  function render() {
+    queued = false;
+    try {
+      const options = document.getElementById('optExtra');
+      const tools = document.getElementById('tools');
+      if (!options || !tools) return;
+      const tool = findZombieTool(tools);
+      let panel = document.getElementById('wzmPanel');
+      if (!active(tool)) {
+        if (panel) panel.remove();
+        if (status) status.title = tool
+          ? 'Мод загружен. Выберите элемент зомби, чтобы открыть меню.'
+          : 'Мод загружен, но элемент зомби не найден.';
+        return;
+      }
+      if (panel && panel.parentElement !== options) {
+        panel.remove();
+        panel = null;
+      }
+      if (!panel) {
+        panel = document.createElement('section');
+        panel.id = 'wzmPanel';
+        panel.innerHTML = '<b>Вид зомби</b><div class="wzm-grid"></div><p class="wzm-note"></p>';
+        const grid = panel.querySelector('.wzm-grid');
+        for (const type of types) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.dataset.zombieType = type.id;
+          button.textContent = type.label;
+          button.setAttribute('aria-pressed', String(type.id === selected));
+          button.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            selected = type.id;
+            refreshSelection(panel);
+          });
+          grid.appendChild(button);
+        }
+        options.appendChild(panel);
+      }
+      if (status) status.title = 'Скрипт загружен; меню выбора подключено.';
+      refreshSelection(panel);
+    } catch (error) {
+      console.error('[Wreckbox Zombie Mod]', error);
+      if (status) status.title = 'Ошибка мода — подробности в консоли.';
+    }
+  }
+
+  function refreshSelection(panel) {
+    for (const button of panel.querySelectorAll('[data-zombie-type]')) {
+      const value = String(button.dataset.zombieType === selected);
+      if (button.getAttribute('aria-pressed') !== value) button.setAttribute('aria-pressed', value);
+    }
+    const type = types.find(item => item.id === selected) || types[0];
+    const note = selected === 'standard'
+      ? type.note
+      : type.note + ' Игровой эффект пока не подключён.';
+    const noteEl = panel.querySelector('.wzm-note');
+    if (noteEl && noteEl.textContent !== note) noteEl.textContent = note;
+    window.__WRECKBOX_SELECTED_ZOMBIE_TYPE__ = selected;
+  }
+
+  function schedule() {
+    if (queued) return;
+    queued = true;
+    nextFrame(render);
+  }
+
+  function init() {
+    ensureUi();
+    if (!document.getElementById('tools') || !document.getElementById('optExtra')) {
+      if (!bootObserver && document.documentElement) {
+        bootObserver = new MutationObserver(() => {
+          if (document.getElementById('tools') && document.getElementById('optExtra')) {
+            bootObserver.disconnect();
+            bootObserver = null;
+            init();
+          }
+        });
+        bootObserver.observe(document.documentElement, { childList: true, subtree: true });
+      }
+      return;
+    }
+    if (bootObserver) {
+      bootObserver.disconnect();
+      bootObserver = null;
+    }
+    if (observer) return;
+    observer = new MutationObserver(schedule);
+    observer.observe(document.getElementById('tools'), {
+      childList: true, subtree: true, attributes: true,
+      attributeFilter: ['class', 'data-tool', 'aria-pressed', 'aria-selected']
+    });
+    observer.observe(document.getElementById('optExtra'), { childList: true });
+    schedule();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+  } else {
+    init();
   }
 })();
