@@ -68,13 +68,6 @@
     if (note) note.textContent = type.note;
     window.__WRECKBOX_SELECTED_ZOMBIE_TYPE__ = selectedType;
     window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__ = typeConfig[selectedType] || typeConfig.standard;
-    try {
-      window.dispatchEvent(new CustomEvent('wzm:zombie-type-change', {
-        detail: { type: selectedType, config: window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__ }
-      }));
-    } catch (_) {
-      // Keep the selection UI functional in older embedded webviews.
-    }
   }
 
   function render() {
@@ -111,6 +104,13 @@
         button.addEventListener('click', () => {
           selectedType = type.id;
           updateSelection(panel);
+          try {
+            window.dispatchEvent(new CustomEvent('wzm:zombie-type-change', {
+              detail: { type: selectedType, config: window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__ }
+            }));
+          } catch (_) {
+            // Keep the selection UI functional in older embedded webviews.
+          }
         });
         grid.appendChild(button);
       });
