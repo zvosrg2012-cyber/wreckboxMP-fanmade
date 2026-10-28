@@ -1,14 +1,30 @@
 /* WreckboxMP 1.9.2 zombie menu mod.
-   Keeps the menu lightweight and constrains long text so it cannot stretch
-   the game's existing options panel. Game-side NPC effects require a game hook. */
+   Installs a guarded hook before the game's encrypted script and applies the
+   selected speed multiplier when the game converts a person into a zombie. */
 (() => {
   'use strict';
   if (window.__WRECKBOX_ZOMBIE_MOD_LOADED__) return;
   window.__WRECKBOX_ZOMBIE_MOD_LOADED__ = true;
 
+  // Patch only the known zombie-conversion speed assignment in the decrypted
+  // game source. All other game code passes through unchanged.
+  if (!window.__WRECKBOX_EVAL_HOOK_INSTALLED__) {
+    const originalEval = window.eval;
+    window.eval = function (source) {
+      const target = 't.spd=B(9,13),t.runSpd=B(28,38)';
+      if (typeof source === 'string' && source.includes(target)) {
+        const multiplier = '((window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__&&window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__.speedMultiplier)||1)';
+        source = source.replace(target, 't.spd=B(9,13)*' + multiplier + ',t.runSpd=B(28,38)*' + multiplier);
+        window.__WRECKBOX_ZOMBIE_SPEED_HOOK_ACTIVE__ = true;
+      }
+      return originalEval(source);
+    };
+    window.__WRECKBOX_EVAL_HOOK_INSTALLED__ = true;
+  }
+
   const types = [
     { id: 'standard', label: 'Обычный', note: 'Стандартный тип игры.' },
-    { id: 'fast', label: 'Быстрый', note: 'Красный вид, кровавый эффект и синие светящиеся глаза в темноте; высокая скорость и враждебность к другим типам требуют подключения к игровому коду.' },
+    { id: 'fast', label: 'Быстрый', note: 'Скорость ×1,75 для новых зомби. Красная окраска и особые эффекты пока не подключены.' },
     { id: 'heavy', label: 'Тяжёлый', note: 'Тип пока не подключён к игровой логике.' },
     { id: 'hunter', label: 'Охотник', note: 'Тип пока не подключён к игровой логике.' }
   ];
@@ -27,6 +43,7 @@
   };
   window.__WRECKBOX_ZOMBIE_TYPE_CONFIG__ = typeConfig;
   window.__WRECKBOX_SELECTED_ZOMBIE_TYPE__ = selectedType;
+  window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__ = typeConfig.standard;
 
   const style = document.createElement('style');
   style.textContent = [
