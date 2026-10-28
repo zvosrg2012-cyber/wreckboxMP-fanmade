@@ -104,13 +104,10 @@
         button.addEventListener('click', () => {
           selectedType = type.id;
           updateSelection(panel);
-          try {
-            window.dispatchEvent(new CustomEvent('wzm:zombie-type-change', {
-              detail: { type: selectedType, config: window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__ }
-            }));
-          } catch (_) {
-            // Keep the selection UI functional in older embedded webviews.
-          }
+          // Do not dispatch into the game's event system from this prototype:
+          // third-party listeners may synchronously mutate game state or hang the UI.
+          // Selection remains available through window.__WRECKBOX_SELECTED_ZOMBIE_TYPE__
+          // and window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__.
         });
         grid.appendChild(button);
       });
