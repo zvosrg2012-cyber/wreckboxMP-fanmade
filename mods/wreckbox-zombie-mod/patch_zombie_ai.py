@@ -84,8 +84,9 @@ def main() -> int:
     if not backup.exists():
         shutil.copy2(path, backup)
     path.write_bytes(raw_new)
-    print(f"Patched core zombie AI in {path}. Backup: {backup}")
-    print("Test in-game: spawn zombies and check whether they leave idle state and pursue people.")
+    print(f"Patched core zombie AI movement in {path}. Backup: {backup}")
+    print("Applied: reactivate idle zombie AI; permit zombie movement when gravity is zero.")
+    print("Not applied: door breaking and resident attacks/eating; those need separate game-core hooks.")
     return 0
 
 if __name__ == "__main__":
