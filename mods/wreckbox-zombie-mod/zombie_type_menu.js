@@ -13,7 +13,7 @@
     window.eval = function (source) {
       // Accept harmless whitespace changes in minified game builds, but only
       // patch the known pair of zombie movement-speed assignments.
-      const speedPattern = /t\\.spd\\s*=\\s*B\\(9\\s*,\\s*13\\)\\s*,\\s*t\\.runSpd\\s*=\\s*B\\(28\\s*,\\s*38\\)/;
+      const speedPattern = /t\.spd\s*=\s*B\(9\s*,\s*13\)\s*,\s*t\.runSpd\s*=\s*B\(28\s*,\s*38\)/;
       if (typeof source === 'string' && speedPattern.test(source)) {
         const multiplier = '((window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__&&window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__.speedMultiplier)||1)';
         source = source.replace(speedPattern, 't.spd=B(9,13)*' + multiplier + ',t.runSpd=B(28,38)*' + multiplier);
