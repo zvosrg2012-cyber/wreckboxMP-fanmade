@@ -21,6 +21,12 @@ PATCH = MARKER + (
     b'skip:null,skipT:0,lx:null,ly:0,lostT:0};'
     b't.state="act";t.pose="";t.vx=0;}'
 )
+# A second guard in Gx used to freeze every entity when gravity was zero.
+# Zombies must still be allowed through the AI update path in zero gravity.
+ZERO_GRAVITY_OLD = b'if(O<=0)return void px(t,t.vx,-12,B(-.4,.4));'
+ZERO_GRAVITY_NEW = b'if(O<=0&&!t.zomb)return void px(t,t.vx,-12,B(-.4,.4));'
+MOVE_OLD = b't.onGround?t.vx+=(n*t.dir-t.vx)*Math.min(1,10*e):t.vx*=1-.3*e'
+MOVE_NEW = b't.onGround||t.zomb?t.vx+=(n*t.dir-t.vx)*Math.min(1,10*e):t.vx*=1-.3*e'
 
 def main() -> int:
     path = Path(sys.argv[1] if len(sys.argv) > 1 else "index.html")
@@ -50,14 +56,22 @@ def main() -> int:
         for i, value in enumerate(encrypted)
     )
 
-    if PATCH in decoded:
-        print("Zombie AI patch is already present; no changes made.")
+    if PATCH in decoded and ZERO_GRAVITY_NEW in decoded and MOVE_NEW in decoded:
+        print("Zombie AI movement patch is already present; no changes made.")
         return 0
     if MARKER not in decoded:
         print("Zombie AI update point not found; file left unchanged.", file=sys.stderr)
         return 2
 
-    decoded = decoded.replace(MARKER, PATCH, 1)
+    # Apply each exact, version-specific replacement once. Abort before writing
+    # if an expected anchor is missing, so a different game build is untouched.
+    for old, new in ((MARKER, PATCH), (ZERO_GRAVITY_OLD, ZERO_GRAVITY_NEW), (MOVE_OLD, MOVE_NEW)):
+        if new in decoded:
+            continue
+        if old not in decoded:
+            print("Zombie AI patch anchor not found; file left unchanged: " + old[:60].decode(), file=sys.stderr)
+            return 2
+        decoded = decoded.replace(old, new, 1)
     encrypted_new = bytes(
         value ^ key[i % len(key)] ^ ((i * 31 + (i >> 8)) & 255)
         for i, value in enumerate(decoded)
