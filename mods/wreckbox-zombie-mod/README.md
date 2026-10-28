@@ -1,21 +1,24 @@
 # WreckboxMP Zombie Menu Mod — 1.9.2
 
-This folder contains the optional zombie-type menu mod for branch \`1.9.2\`.
+Optional zombie-type menu for WreckboxMP.
 
 ## Install
 
-1. Keep the original game files in place; \`index.html\` must remain in the game root.
-2. Copy this entire folder to \`<game>\mods\wreckbox-zombie-mod\`.
-3. Run \`install_mod.bat\`, then restart the game.
+1. Keep the original game files in place; `index.html` must remain in the game root.
+2. Copy this folder to `<game>\mods\wreckbox-zombie-mod\`.
+3. Run `install_mod.bat` and restart the game.
 
-The installer creates a timestamped backup of \`index.html\` before adding the menu script. It places the mod script before the game's encrypted main script so the speed hook can patch the code before it runs. Rerunning the installer updates an older loader placement.
+The installer backs up the local game-root `index.html`, then inserts the menu script before the game's encrypted main script and routes the decrypted source through the mod hook.
 
-## Fast zombies
+## Zombie types
 
-- Choose **Быстрый** before creating/turning new zombies.
-- The mod patches the game's zombie-conversion function so new zombies receive a 1.75× multiplier for both walking and running speed.
-- Existing zombies are not retroactively changed; select the type before spawning/turning them.
-- Red coloring, glowing eyes, blood effects, and hostility between zombie types are not implemented yet.
-- Heavy and Hunter remain placeholders.
+Choose a type before infecting a person or creating new zombies. The settings apply when the game's zombie-conversion function runs; existing zombies are not retroactively changed.
 
-Only files in this \`mods\` folder are maintained in the repository. The installer modifies the local game-root \`index.html\` when you run it and makes a backup first.
+- **Обычный:** normal speed and appearance.
+- **Быстрый:** 1.75× walking and running speed; red clothing and darker red skin.
+- **Тяжёлый:** 0.58× speed, 3.4× health, grey clothing/skin and a dark helmet.
+- **Охотник:** 1.45× speed, 0.82× health, dark blue-purple clothing and darker skin.
+
+The game source is minified and encrypted in the original HTML. The mod checks for the expected conversion-code markers before patching; if they change in a future game build, the hook will report inactive rather than blindly patch unrelated code.
+
+Only files inside this `mods` folder are maintained in the repository. Running the installer modifies the local game-root `index.html` and creates a timestamped backup first.
