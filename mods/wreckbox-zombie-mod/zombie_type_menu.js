@@ -11,10 +11,19 @@
   if (!window.__WRECKBOX_RUN_GAME_SOURCE__) {
     const originalEval = window.eval;
     window.__WRECKBOX_RUN_GAME_SOURCE__ = function (source) {
-      const speedPattern = /t\.spd\s*=\s*B\(9\s*,\s*13\)\s*,\s*t\.runSpd\s*=\s*B\(28\s*,\s*38\)/;
-      if (typeof source === 'string' && speedPattern.test(source)) {
-        const multiplier = '((window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__&&window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__.speedMultiplier)||1)';
-        source = source.replace(speedPattern, 't.spd=B(9,13)*' + multiplier + ',t.runSpd=B(28,38)*' + multiplier);
+      // Patch the actual infection/turning function in the decrypted game code.
+      // This is the path used both when a person is bitten and when a person
+      // is manually infected with the zombie tool.
+      const conversionMarker = 't.zomb={goal:void 0===e.goal?null:e.goal,t0:$t},t.role="zombie"';
+      const speedMarker = 't.spd=B(9,13),t.runSpd=B(28,38),t.panic=0';
+      const visualMarker = 't.hp=Math.max(t.hp,70),t.blood=Math.max(t.blood,60),t.bleed=Math.min(t.bleed,.15),t.look.helmet=t.look.helmet&&Math.random()<.5,yT.n++';
+      if (typeof source === 'string' && source.includes(conversionMarker) &&
+          source.includes(speedMarker) && source.includes(visualMarker)) {
+        const cfg = '((window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__&&window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__)||{})';
+        source = source.replace(speedMarker,
+          't.spd=B(9,13)*(' + cfg + '.speedMultiplier||1),t.runSpd=B(28,38)*(' + cfg + '.speedMultiplier||1),t.panic=0');
+        source = source.replace(visualMarker,
+          't.hp=Math.max(t.hp,70),t.blood=Math.max(t.blood,60),t.bleed=Math.min(t.bleed,.15),t.look.helmet=t.look.helmet&&Math.random()<.5,(function(z){const c=' + cfg + ';if(c.hpMultiplier)z.hp=Math.max(70,z.hp)*c.hpMultiplier;if(c.bodyColor){z.look.shirt=c.bodyColor;z.look.pants=c.pantsColor||c.bodyColor;z.look.skin=c.skinColor||z.look.skin;z.look.hair=c.hairColor||z.look.hair;z.look.helmet=!!c.helmet;z.look.helmCol=c.helmetColor||c.bodyColor;}})(t),yT.n++');
         window.__WRECKBOX_ZOMBIE_SPEED_HOOK_ACTIVE__ = true;
       } else {
         window.__WRECKBOX_ZOMBIE_SPEED_HOOK_ACTIVE__ = false;
@@ -25,9 +34,9 @@
 
   const types = [
     { id: 'standard', label: 'Обычный', note: 'Стандартный тип игры.' },
-    { id: 'fast', label: 'Быстрый', note: 'Скорость ×1,75 для новых зомби. Красная окраска и особые эффекты пока не подключены.' },
-    { id: 'heavy', label: 'Тяжёлый', note: 'Тип пока не подключён к игровой логике.' },
-    { id: 'hunter', label: 'Охотник', note: 'Тип пока не подключён к игровой логике.' }
+    { id: 'fast', label: 'Быстрый', note: 'Красная одежда, скорость ×1,75; заражённые, превращённые после выбора, будут быстрее.' },
+    { id: 'heavy', label: 'Тяжёлый', note: 'Медленный, крепкий и в тёмно-серой одежде; здоровье ×3,4.' },
+    { id: 'hunter', label: 'Охотник', note: 'Быстрый преследователь в тёмной одежде; здоровье немного ниже обычного.' }
   ];
   let selectedType = 'standard';
   let observer = null;
@@ -38,9 +47,9 @@
   // does not alter NPCs until a compatible game-side handler reads it.
   const typeConfig = {
     standard: { speedMultiplier: 1, bodyColor: null, eyeColor: null, bloody: false, glowEyesInDark: false, hostileToOtherZombieTypes: false },
-    fast: { speedMultiplier: 1.75, bodyColor: '#b51f2b', eyeColor: '#278dff', bloody: true, glowEyesInDark: true, hostileToOtherZombieTypes: true },
-    heavy: { speedMultiplier: 1, bodyColor: null, eyeColor: null, bloody: false, glowEyesInDark: false, hostileToOtherZombieTypes: false },
-    hunter: { speedMultiplier: 1, bodyColor: null, eyeColor: null, bloody: false, glowEyesInDark: false, hostileToOtherZombieTypes: false }
+    fast: { speedMultiplier: 1.75, bodyColor: '#b51f2b', pantsColor: '#3d1519', skinColor: '#a85d60', hairColor: '#211719', hpMultiplier: 1, helmet: false, bloody: true, glowEyesInDark: true, hostileToOtherZombieTypes: true },
+    heavy: { speedMultiplier: 0.58, bodyColor: '#41464b', pantsColor: '#24282d', skinColor: '#777d80', hairColor: '#303336', hpMultiplier: 3.4, helmet: true, helmetColor: '#292e33', bloody: false, glowEyesInDark: false, hostileToOtherZombieTypes: false },
+    hunter: { speedMultiplier: 1.45, bodyColor: '#292b42', pantsColor: '#171824', skinColor: '#6d737d', hairColor: '#171820', hpMultiplier: 0.82, helmet: false, bloody: true, glowEyesInDark: true, hostileToOtherZombieTypes: false }
   };
   window.__WRECKBOX_ZOMBIE_TYPE_CONFIG__ = typeConfig;
   window.__WRECKBOX_SELECTED_ZOMBIE_TYPE__ = selectedType;
