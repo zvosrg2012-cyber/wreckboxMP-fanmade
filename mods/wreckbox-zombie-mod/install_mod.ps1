@@ -12,6 +12,16 @@ $html = [System.IO.File]::ReadAllText($indexPath, [System.Text.Encoding]::UTF8)
 # Move an older loader block before the encrypted game script.
 $oldBlockPattern = '(?s)<!-- WRECKBOX ZOMBIE MOD: BEGIN -->.*?<!-- WRECKBOX ZOMBIE MOD: END -->\s*'
 $html = [regex]::Replace($html, $oldBlockPattern, '')
+
+# Route the game's decrypted JavaScript through the mod's source patcher.
+# This is more reliable than replacing window.eval because the game uses (0,eval).
+$originalEvalCall = '(0,eval)(new TextDecoder().decode(u))'
+$hookedEvalCall = 'window.__WRECKBOX_RUN_GAME_SOURCE__ ? window.__WRECKBOX_RUN_GAME_SOURCE__(new TextDecoder().decode(u)) : (0,eval)(new TextDecoder().decode(u))'
+if ($html.Contains($originalEvalCall)) {
+  $html = $html.Replace($originalEvalCall, $hookedEvalCall)
+} elseif (-not $html.Contains('__WRECKBOX_RUN_GAME_SOURCE__(new TextDecoder().decode(u))')) {
+  throw 'Could not find the game decryptor eval call. No files were changed.'
+}
 if ($html -notmatch '(?is)<script>\s*\(\(\)=>\{const k=\[') {
   throw 'Could not find the expected encrypted game script. No files were changed.'
 }
