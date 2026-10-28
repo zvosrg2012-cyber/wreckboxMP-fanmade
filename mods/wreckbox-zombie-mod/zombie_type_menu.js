@@ -6,22 +6,21 @@
   if (window.__WRECKBOX_ZOMBIE_MOD_LOADED__) return;
   window.__WRECKBOX_ZOMBIE_MOD_LOADED__ = true;
 
-  // Patch only the known zombie-conversion speed assignment in the decrypted
-  // game source. All other game code passes through unchanged.
-  if (!window.__WRECKBOX_EVAL_HOOK_INSTALLED__) {
+  // The installer routes the game's decrypted source through this function
+  // explicitly. This avoids relying on replacement of the global eval binding.
+  if (!window.__WRECKBOX_RUN_GAME_SOURCE__) {
     const originalEval = window.eval;
-    window.eval = function (source) {
-      // Accept harmless whitespace changes in minified game builds, but only
-      // patch the known pair of zombie movement-speed assignments.
+    window.__WRECKBOX_RUN_GAME_SOURCE__ = function (source) {
       const speedPattern = /t\.spd\s*=\s*B\(9\s*,\s*13\)\s*,\s*t\.runSpd\s*=\s*B\(28\s*,\s*38\)/;
       if (typeof source === 'string' && speedPattern.test(source)) {
         const multiplier = '((window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__&&window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__.speedMultiplier)||1)';
         source = source.replace(speedPattern, 't.spd=B(9,13)*' + multiplier + ',t.runSpd=B(28,38)*' + multiplier);
         window.__WRECKBOX_ZOMBIE_SPEED_HOOK_ACTIVE__ = true;
+      } else {
+        window.__WRECKBOX_ZOMBIE_SPEED_HOOK_ACTIVE__ = false;
       }
       return originalEval(source);
     };
-    window.__WRECKBOX_EVAL_HOOK_INSTALLED__ = true;
   }
 
   const types = [
