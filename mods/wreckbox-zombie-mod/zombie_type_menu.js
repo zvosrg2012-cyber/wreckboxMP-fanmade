@@ -25,7 +25,7 @@
           't.hp=Math.max(t.hp,70),t.blood=Math.max(t.blood,60),t.bleed=Math.min(t.bleed,.15),t.look.helmet=t.look.helmet&&Math.random()<.5,(function(z){const c=' + cfg + ';z.__wzmType=window.__WRECKBOX_SELECTED_ZOMBIE_TYPE__||"standard";if(c.hpMultiplier)z.hp=Math.max(70,z.hp)*c.hpMultiplier;if(c.bodyColor){z.look.shirt=c.bodyColor;z.look.pants=c.pantsColor||c.bodyColor;z.look.skin=c.skinColor||z.look.skin;z.look.hair=c.hairColor||z.look.hair;z.look.helmet=!!c.helmet;z.look.helmCol=c.helmetColor||c.bodyColor;}})(t),yT.n++');
         // The base game excludes zombies from GT's target search. Let fast
         // variants attack ordinary zombies, and let fire variants breathe fire.
-        const acidToolAnchor = 'BS("volcano",{name:r("Вулкан")';
+        const acidToolAnchor = 'const CA=["camera"';
         const acidToolCode = `const __wzmAcidPools=[];
 function __wzmAcidPool(x,y,r=25){__wzmAcidPools.push({x,y,r,until:$t+60,next:0});}
 const __wzmAcidCanvas=document.createElement("canvas");
