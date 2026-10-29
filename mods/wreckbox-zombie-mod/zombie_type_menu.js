@@ -24,6 +24,18 @@
           't.spd=B(9,13)*(' + cfg + '.speedMultiplier||1),t.runSpd=B(28,38)*(' + cfg + '.speedMultiplier||1),t.panic=0');
         source = source.replace(visualMarker,
           't.hp=Math.max(t.hp,70),t.blood=Math.max(t.blood,60),t.bleed=Math.min(t.bleed,.15),t.look.helmet=t.look.helmet&&Math.random()<.5,(function(z){const c=' + cfg + ';if(c.hpMultiplier)z.hp=Math.max(70,z.hp)*c.hpMultiplier;if(c.bodyColor){z.look.shirt=c.bodyColor;z.look.pants=c.pantsColor||c.bodyColor;z.look.skin=c.skinColor||z.look.skin;z.look.hair=c.hairColor||z.look.hair;z.look.helmet=!!c.helmet;z.look.helmCol=c.helmetColor||c.bodyColor;}})(t),yT.n++');
+        // The base game excludes zombies from GT's target search. Let fast
+        // variants attack ordinary zombies, and let fire variants breathe fire.
+        const targetFilter = 'if(!ET(i)||i===e.skip)continue;';
+        if (source.includes(targetFilter)) {
+          source = source.replace(targetFilter,
+            'if((!ET(i)&&!(t.__wzmType==="fast"&&i.zomb&&!i.dead&&!i.gone&&(i.__wzmType==="standard"||!i.__wzmType)))||i===e.skip)continue;');
+        }
+        const attackMarker = 'if(n)return n!==e.tgt&&(t.nav=null,!e.tgt&&$t-(e.lostT||-9)>4&&lL.zomb(t.x,t.y-14,"growl")),e.tgt=n,e.lx=a,e.ly=r,e.lostT=$t,void $T(t,e,a,r,s<80);';
+        if (source.includes(attackMarker)) {
+          source = source.replace(attackMarker,
+            'if(n){if(t.__wzmType==="fire"&&s<125&&$t>(t.__wzmFireAt||0)){t.__wzmFireAt=$t+.8;zx(n);for(const q of mm){if(q===t||q.gone||q.dead||q.zomb)continue;const dx=q.x-t.x,dy=q.y-t.y;if(dx*t.dir>0&&Math.abs(dx)<90&&Math.abs(dy)<26)zx(q)}for(let d=1;d<=5;d++){const c=re(t.x+t.dir*d*6,t.y-10);if(c>=0)sl(c,120)}Oi(Ys,t.x+12*t.dir,t.y-13,28*t.dir,-4,.35,5,0)}n!==e.tgt&&(t.nav=null,!e.tgt&&$t-(e.lostT||-9)>4&&lL.zomb(t.x,t.y-14,"growl"));e.tgt=n;e.lx=a;e.ly=r;e.lostT=$t;return void $T(t,e,a,r,s<80)};');
+        }
         window.__WRECKBOX_ZOMBIE_SPEED_HOOK_ACTIVE__ = true;
       } else {
         window.__WRECKBOX_ZOMBIE_SPEED_HOOK_ACTIVE__ = false;
