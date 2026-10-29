@@ -60,13 +60,14 @@ function __wzmAcidDraw(){
         for(const npc of mm){
           if(npc.gone||npc.dead||npc.hidden||npc.__wzmSkeleton)continue;
           if(Math.hypot(npc.x-p.x,(npc.y-8)-p.y)>p.r+5)continue;
-          if(npc.__wzmAcidSince===undefined)npc.__wzmAcidSince=$t;
+          npc.__wzmAcidLastContact=$t;if(npc.__wzmAcidSince===undefined)npc.__wzmAcidSince=$t;
           if($t-npc.__wzmAcidSince>1.4){
             npc.__wzmSkeleton=true;npc.__wzmSkeletonAt=$t;npc.__wzmSkeletonX=npc.x;npc.__wzmSkeletonY=npc.y;
             gx(npc,"acid");npc.gone=true;
           }
         }
       }
+    for(const npc of mm){if(!npc.__wzmSkeleton&&npc.__wzmAcidSince!==undefined&&$t-(npc.__wzmAcidLastContact||0)>.7)npc.__wzmAcidSince=undefined;}
       const x=sx(p.x),y=sy(p.y),r=p.r*pL.zoom;
       if(x+r<-10||x-r>rect.width+10||y+r<-10||y-r>rect.height+10)continue;
       c.save();c.globalAlpha=.55;c.fillStyle="#48ff35";c.shadowColor="#38ff00";c.shadowBlur=12;
