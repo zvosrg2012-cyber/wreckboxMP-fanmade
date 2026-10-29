@@ -69,13 +69,7 @@ function __wzmAcidDraw(){
         }
       }
     for(const npc of mm){if(!npc.__wzmSkeleton&&npc.__wzmAcidSince!==undefined&&$t-(npc.__wzmAcidLastContact||0)>.7)npc.__wzmAcidSince=undefined;}
-      const x=sx(p.x),y=sy(p.y),r=p.r*pL.zoom;
-      if(x+r<-10||x-r>rect.width+10||y+r<-10||y-r>rect.height+10)continue;
-      c.save();c.globalAlpha=.55;c.fillStyle="#48ff35";c.shadowColor="#38ff00";c.shadowBlur=12;
-      c.beginPath();for(let a=0;a<=24;a++){const ang=a/24*Math.PI*2,w=1+.12*Math.sin(ang*3+now/390)+.07*Math.cos(ang*5-now/510),px=x+Math.cos(ang)*r*w,py=y+Math.sin(ang)*r*.34*w;if(a===0)c.moveTo(px,py);else c.lineTo(px,py);}c.closePath();c.fill();
-      c.globalAlpha=.85;c.strokeStyle="#b8ff63";c.lineWidth=1.5;c.beginPath();for(let a=0;a<=24;a++){const ang=a/24*Math.PI*2,w=.78+.07*Math.sin(ang*3+now/390),px=x+Math.cos(ang)*r*w,py=y+Math.sin(ang)*r*.25*w;if(a===0)c.moveTo(px,py);else c.lineTo(px,py);}c.closePath();c.stroke();
-      for(let b=0;b<3;b++){const bx=x+Math.sin(now/330+b*2.2)*r*.55,by=y+Math.cos(now/410+b*1.8)*r*.2-Math.abs(Math.sin(now/280+b))*r*.18;c.globalAlpha=.7;c.fillStyle="#d9ff9a";c.beginPath();c.arc(bx,by,Math.max(1,1.3*pL.zoom),0,Math.PI*2);c.fill();}
-      c.restore();
+      
     }
     for(const npc of mm){
       if(!npc.__wzmSkeleton)continue;
@@ -99,7 +93,7 @@ function __wzmAcidDraw(){
   __wzmAcidFrame=requestAnimationFrame(__wzmAcidDraw);
 }
 __wzmAcidFrame=requestAnimationFrame(__wzmAcidDraw);
-BS("acid",{name:r("Кислота"),icon:"acid",hint:r("Удерживайте — льётся зелёная кислота. Разъедает дерево, кирпич, бетон и гипсокартон; металл, стекло и камень не трогает."),slider:{label:r("Поток"),min:1,max:10,def:5,fmt:t=>r(\`\${t*5} л/с\`)},acc:0,down(t){__wzmAcidPool(t.wx,t.wy,5+this.value*.35);this.acc=0;},update(t){if(!IS.down)return;cA=1;const e=this.value,n=Ii(),o=Td(),a=IS.wx>pL.x?o.x0:o.x1,r=o.y1,s=IS.wx-a,i=IS.wy-r,l=Math.hypot(s,i)||1;for(let k=0;k<(4+e)*n;k++){const ang=6.283*Math.random(),speed=B(40,170);Oi(Js,IS.wx+B(-4,4),IS.wy+B(-4,4),Math.cos(ang)*speed+s/l*120,Math.sin(ang)*speed-40+i/l*120,B(.5,1.1),2,ki(70,255,40))}const amount=4*e*t;for(let k=0;k<2;k++)__wzmAcidPool(IS.wx+B(-2,2),IS.wy+B(-2,2),5+this.value*.35);for(let k=0;k<3;k++)tc(IS.wx+B(-5,5),IS.wy+B(-5,5),amount/3);cl(IS.wx,IS.wy,6*(2+.5*e));rb(IS.wx,IS.wy,6*(2+.5*e)+6,e);for(const q of Xa){if(q.dead||q.pinned||q.mass>6)continue;const dx=q.x-IS.wx,dy=q.y-IS.wy,d=Math.hypot(dx,dy);if(d<=40+4*e){_r(q);q.vx+=dx/(d+1)*300*t*e/q.mass;q.vy+=dy/(d+1)*200*t*e/q.mass}}},draw(t){if(!IS.down)return;const e=Td(),n=IS.wx>pL.x?e.x0:e.x1,o=e.y1;t.beginPath();t.moveTo(n,o);t.quadraticCurveTo((n+IS.wx)/2,Math.min(o,IS.wy)-80,IS.wx,IS.wy);t.strokeStyle="rgba(72,255,53,.72)";t.lineWidth=5/pL.zoom;t.lineCap="round";t.stroke();t.beginPath();t.moveTo(n,o);t.quadraticCurveTo((n+IS.wx)/2,Math.min(o,IS.wy)-80,IS.wx,IS.wy);t.strokeStyle="rgba(190,255,90,.95)";t.lineWidth=1.5/pL.zoom;t.stroke();}});`;
+BS("acid",{name:r("Кислота"),icon:"drop",hint:r("Удерживайте — льётся зелёная кислота. Разъедает дерево, кирпич, бетон и гипсокартон; металл, стекло и камень не трогает."),slider:{label:r("Поток"),min:1,max:10,def:5,fmt:t=>r(\`\${t*5} л/с\`)},acc:0,down(t){__wzmAcidPool(t.wx,t.wy,5+this.value*.35);this.acc=0;},update(t){if(!IS.down)return;cA=1;const e=this.value,n=Ii(),o=Td(),a=IS.wx>pL.x?o.x0:o.x1,r=o.y1,s=IS.wx-a,i=IS.wy-r,l=Math.hypot(s,i)||1;for(let k=0;k<(4+e)*n;k++){const ang=6.283*Math.random(),speed=B(40,170);Oi(Js,IS.wx+B(-4,4),IS.wy+B(-4,4),Math.cos(ang)*speed+s/l*120,Math.sin(ang)*speed-40+i/l*120,B(.5,1.1),2,ki(70,255,40))}const amount=4*e*t;for(let k=0;k<2;k++)__wzmAcidPool(IS.wx+B(-2,2),IS.wy+B(-2,2),5+this.value*.35);for(let k=0;k<3;k++)tc(IS.wx+B(-5,5),IS.wy+B(-5,5),amount/3);cl(IS.wx,IS.wy,6*(2+.5*e));rb(IS.wx,IS.wy,6*(2+.5*e)+6,e);for(const q of Xa){if(q.dead||q.pinned||q.mass>6)continue;const dx=q.x-IS.wx,dy=q.y-IS.wy,d=Math.hypot(dx,dy);if(d<=40+4*e){_r(q);q.vx+=dx/(d+1)*300*t*e/q.mass;q.vy+=dy/(d+1)*200*t*e/q.mass}}},draw(t){if(!IS.down)return;const e=Td(),n=IS.wx>pL.x?e.x0:e.x1,o=e.y1;t.strokeStyle="rgba(72,255,53,.72)";t.lineWidth=5/pL.zoom;t.beginPath();t.moveTo(n,o);t.quadraticCurveTo((n+IS.wx)/2,Math.min(o,IS.wy)-80,IS.wx,IS.wy);t.stroke();}});`;
         if (source.includes(acidToolAnchor)) source = source.replace(acidToolAnchor, acidToolCode + acidToolAnchor);
         source = source.replace('const CA=["camera","hammer","ball","winch","dynamite","demolish","bomb","nuke","rocket","flame","molotov","lava","water","laser"',
           'const CA=["camera","hammer","ball","winch","dynamite","demolish","bomb","nuke","rocket","flame","molotov","lava","water","acid","laser"');
