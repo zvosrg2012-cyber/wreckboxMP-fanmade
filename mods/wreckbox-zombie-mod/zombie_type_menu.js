@@ -1,6 +1,5 @@
-/* WreckboxMP 1.9.2 zombie menu mod.
-   Installs a guarded hook before the game's encrypted script and applies the
-   selected speed multiplier when the game converts a person into a zombie. */
+/* WreckboxMP 1.9.2 zombie and acid mechanics mod.
+   Hooks zombie conversion and adds fire breathing plus corrosive acid pools. */
 (() => {
   'use strict';
   if (window.__WRECKBOX_ZOMBIE_MOD_LOADED__) return;
@@ -21,9 +20,9 @@
           source.includes(speedMarker) && source.includes(visualMarker)) {
         const cfg = '((window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__&&window.__WRECKBOX_SELECTED_ZOMBIE_CONFIG__)||{})';
         source = source.replace(speedMarker,
-          't.spd=B(9,13)*(' + cfg + '.speedMultiplier||1),t.runSpd=B(28,38)*(' + cfg + '.speedMultiplier||1),t.panic=0');
+          't.spd=(window.__WRECKBOX_SELECTED_ZOMBIE_TYPE__==="fast"?B(23,30):window.__WRECKBOX_SELECTED_ZOMBIE_TYPE__==="fire"?B(14,19):B(9,13)),t.runSpd=(window.__WRECKBOX_SELECTED_ZOMBIE_TYPE__==="fast"?B(78,96):window.__WRECKBOX_SELECTED_ZOMBIE_TYPE__==="fire"?B(42,58):B(28,38)),t.panic=0');
         source = source.replace(visualMarker,
-          't.hp=Math.max(t.hp,70),t.blood=Math.max(t.blood,60),t.bleed=Math.min(t.bleed,.15),t.look.helmet=t.look.helmet&&Math.random()<.5,(function(z){const c=' + cfg + ';if(c.hpMultiplier)z.hp=Math.max(70,z.hp)*c.hpMultiplier;if(c.bodyColor){z.look.shirt=c.bodyColor;z.look.pants=c.pantsColor||c.bodyColor;z.look.skin=c.skinColor||z.look.skin;z.look.hair=c.hairColor||z.look.hair;z.look.helmet=!!c.helmet;z.look.helmCol=c.helmetColor||c.bodyColor;}})(t),yT.n++');
+          't.hp=Math.max(t.hp,70),t.blood=Math.max(t.blood,60),t.bleed=Math.min(t.bleed,.15),t.look.helmet=t.look.helmet&&Math.random()<.5,(function(z){const c=' + cfg + ';z.__wzmType=window.__WRECKBOX_SELECTED_ZOMBIE_TYPE__||"standard";if(c.hpMultiplier)z.hp=Math.max(70,z.hp)*c.hpMultiplier;if(c.bodyColor){z.look.shirt=c.bodyColor;z.look.pants=c.pantsColor||c.bodyColor;z.look.skin=c.skinColor||z.look.skin;z.look.hair=c.hairColor||z.look.hair;z.look.helmet=!!c.helmet;z.look.helmCol=c.helmetColor||c.bodyColor;}})(t),yT.n++');
         // The base game excludes zombies from GT's target search. Let fast
         // variants attack ordinary zombies, and let fire variants breathe fire.
         const acidToolAnchor = 'BS("volcano",{name:r("Вулкан")';
@@ -122,9 +121,8 @@ BS("acid",{name:r("Кислота"),icon:"drop",hint:r("Удерживайте �
 
   const types = [
     { id: 'standard', label: 'Обычный', note: 'Стандартный тип игры.' },
-    { id: 'fast', label: 'Быстрый', note: 'Красная одежда, скорость ×1,75; заражённые, превращённые после выбора, будут быстрее.' },
-    { id: 'heavy', label: 'Тяжёлый', note: 'Медленный, крепкий и в тёмно-серой одежде; здоровье ×3,4.' },
-    { id: 'hunter', label: 'Охотник', note: 'Быстрый преследователь в тёмной одежде; здоровье немного ниже обычного.' }
+    { id: 'fast', label: 'Быстрый', note: 'Быстро бегает и нападает на обычных зомби.' },
+    { id: 'fire', label: 'Огненный', note: 'Неоново-оранжевый; дыхание огнём поджигает людей и горючие материалы.' }
   ];
   let selectedType = 'standard';
   let observer = null;
@@ -134,10 +132,9 @@ BS("acid",{name:r("Кислота"),icon:"drop",hint:r("Удерживайте �
   // Config is exposed for the game's NPC logic to consume; declaring it alone
   // does not alter NPCs until a compatible game-side handler reads it.
   const typeConfig = {
-    standard: { speedMultiplier: 1, bodyColor: null, eyeColor: null, bloody: false, glowEyesInDark: false, hostileToOtherZombieTypes: false },
-    fast: { speedMultiplier: 1.75, bodyColor: '#b51f2b', pantsColor: '#3d1519', skinColor: '#a85d60', hairColor: '#211719', hpMultiplier: 1, helmet: false, bloody: true, glowEyesInDark: true, hostileToOtherZombieTypes: true },
-    heavy: { speedMultiplier: 0.58, bodyColor: '#41464b', pantsColor: '#24282d', skinColor: '#777d80', hairColor: '#303336', hpMultiplier: 3.4, helmet: true, helmetColor: '#292e33', bloody: false, glowEyesInDark: false, hostileToOtherZombieTypes: false },
-    hunter: { speedMultiplier: 1.45, bodyColor: '#292b42', pantsColor: '#171824', skinColor: '#6d737d', hairColor: '#171820', hpMultiplier: 0.82, helmet: false, bloody: true, glowEyesInDark: true, hostileToOtherZombieTypes: false }
+    standard: { bodyColor: null, helmet: false, hostileToOtherZombieTypes: false },
+    fast: { bodyColor: '#ff2438', pantsColor: '#55111b', skinColor: '#d86a63', hairColor: '#241217', helmet: false, hostileToOtherZombieTypes: true },
+    fire: { bodyColor: '#ff6500', pantsColor: '#ff3b00', skinColor: '#ff8a12', hairColor: '#7d1c00', helmet: false, fireBreath: true, hostileToOtherZombieTypes: false }
   };
   window.__WRECKBOX_ZOMBIE_TYPE_CONFIG__ = typeConfig;
   window.__WRECKBOX_SELECTED_ZOMBIE_TYPE__ = selectedType;
@@ -154,7 +151,9 @@ BS("acid",{name:r("Кислота"),icon:"drop",hint:r("Удерживайте �
     '#wzmPanel button{display:block;width:100%;min-width:0;max-width:100%;min-height:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:7px 9px;border:1px solid var(--line,#454950);background:rgba(255,255,255,.035);color:var(--ink,#f3f0e7);text-align:left;font:600 13px/1.2 var(--font-ui,system-ui);cursor:pointer}',
     '#wzmPanel button[data-zombie-type="fast"]{border-color:rgba(220,48,61,.6)}',
     '#wzmPanel button[data-zombie-type="fast"][aria-pressed="true"]{border-color:#f04452;background:rgba(181,31,43,.24);color:#ff7b85}',
-    '#wzmPanel button[aria-pressed=true]:not([data-zombie-type="fast"]){border-color:var(--accent,#ffc21a);background:rgba(255,194,26,.13);color:var(--accent,#ffc21a)}',
+    '#wzmPanel button[data-zombie-type="fire"]{border-color:rgba(255,101,0,.75)}',
+    '#wzmPanel button[data-zombie-type="fire"][aria-pressed="true"]{border-color:#ff6500;background:rgba(255,101,0,.2);color:#ff9b48}',
+    '#wzmPanel button[aria-pressed=true]:not([data-zombie-type="fast"]):not([data-zombie-type="fire"]){border-color:var(--accent,#ffc21a);background:rgba(255,194,26,.13);color:var(--accent,#ffc21a)}',
     '#wzmPanel .wzm-note{display:-webkit-box;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;max-height:2.8em;margin:8px 0 0;color:var(--ink-faint,#a4a4a4);font-size:11px;line-height:1.4;overflow-wrap:anywhere}',
     '@media(max-width:520px){#wzmStatus{right:3px;font-size:9px;padding:9px 5px}#wzmPanel{left:6px;width:min(180px,calc(100vw - 12px));max-width:calc(100vw - 12px);padding:8px}#wzmPanel button{min-height:32px;padding:6px;font-size:12px}}'
   ].join('');
