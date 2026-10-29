@@ -26,7 +26,7 @@
         // The base game excludes zombies from GT's target search. Let fast
         // variants attack ordinary zombies, and let fire variants breathe fire.
         const acidToolAnchor = 'BS("volcano",{name:r("Вулкан")';
-        const acidToolCode = \`const __wzmAcidPools=[];
+        const acidToolCode = `const __wzmAcidPools=[];
 function __wzmAcidPool(x,y,r=25){__wzmAcidPools.push({x,y,r,until:$t+60,next:0});}
 const __wzmAcidCanvas=document.createElement("canvas");
 __wzmAcidCanvas.id="wzm-acid-overlay";
@@ -97,7 +97,7 @@ function __wzmAcidDraw(){
   __wzmAcidFrame=requestAnimationFrame(__wzmAcidDraw);
 }
 __wzmAcidFrame=requestAnimationFrame(__wzmAcidDraw);
-BS("acid",{name:r("Кислота"),icon:"drop",hint:r("Удерживайте — разливает зелёную кислоту. Она растворяет сталь, чугун и свинец; житель долго не выживет в луже."),slider:{label:r("Поток"),min:1,max:10,def:5,fmt:t=>r(\`\${t*5} л/с\`)},acc:0,down(t){__wzmAcidPool(t.wx,t.wy,20+this.value*1.8);this.acc=0;},update(t){if(!IS.down)return;this.acc+=t*(2+this.value*.8);while(this.acc>=.12){this.acc-=.12;__wzmAcidPool(IS.wx+B(-4,4),IS.wy+B(-3,3),15+this.value*1.8);}},draw(t){if(!IS.over)return;t.strokeStyle="rgba(72,255,53,.85)";t.fillStyle="rgba(72,255,53,.14)";t.lineWidth=2/pL.zoom;t.beginPath();t.ellipse(IS.wx,IS.wy,20+this.value*1.8,8+this.value*.8,0,0,Math.PI*2);t.fill();t.stroke();}});\`;
+BS("acid",{name:r("Кислота"),icon:"drop",hint:r("Удерживайте — разливает зелёную кислоту. Она растворяет сталь, чугун и свинец; житель долго не выживет в луже."),slider:{label:r("Поток"),min:1,max:10,def:5,fmt:t=>r(\`\${t*5} л/с\`)},acc:0,down(t){__wzmAcidPool(t.wx,t.wy,20+this.value*1.8);this.acc=0;},update(t){if(!IS.down)return;this.acc+=t*(2+this.value*.8);while(this.acc>=.12){this.acc-=.12;__wzmAcidPool(IS.wx+B(-4,4),IS.wy+B(-3,3),15+this.value*1.8);}},draw(t){if(!IS.over)return;t.strokeStyle="rgba(72,255,53,.85)";t.fillStyle="rgba(72,255,53,.14)";t.lineWidth=2/pL.zoom;t.beginPath();t.ellipse(IS.wx,IS.wy,20+this.value*1.8,8+this.value*.8,0,0,Math.PI*2);t.fill();t.stroke();}});`;
         if (source.includes(acidToolAnchor)) source = source.replace(acidToolAnchor, acidToolCode + acidToolAnchor);
         source = source.replace('const CA=["camera","hammer","ball","winch","dynamite","demolish","bomb","nuke","rocket","flame","molotov","lava","water","laser"',
           'const CA=["camera","hammer","ball","winch","dynamite","demolish","bomb","nuke","rocket","flame","molotov","lava","water","acid","laser"');
