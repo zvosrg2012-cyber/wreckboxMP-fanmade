@@ -55,7 +55,8 @@ function __wzmAcidDraw(){
           if(xx*xx+yy*yy>rad*rad)continue;
           const col=cx+xx,row=cy+yy;if(!ne(col,row))continue;
           const cell=row*u+col,mat=gt[cell];
-          if(mat&&(mat===4||mat===nt||mat===et)&&!st[mat].indestructible)ue(cell,0,0,0);
+          // Keep metals, glass and rock intact; acid attacks only susceptible non-metal materials.
+          if(mat&&(mat===1||mat===2||mat===3||mat===6)&&!st[mat].indestructible)ue(cell,0,0,0);
         }
         for(const npc of mm){
           if(npc.gone||npc.dead||npc.hidden||npc.__wzmSkeleton)continue;
@@ -71,8 +72,8 @@ function __wzmAcidDraw(){
       const x=sx(p.x),y=sy(p.y),r=p.r*pL.zoom;
       if(x+r<-10||x-r>rect.width+10||y+r<-10||y-r>rect.height+10)continue;
       c.save();c.globalAlpha=.55;c.fillStyle="#48ff35";c.shadowColor="#38ff00";c.shadowBlur=12;
-      c.beginPath();c.ellipse(x,y,r,r*.38,0,0,Math.PI*2);c.fill();
-      c.globalAlpha=.85;c.strokeStyle="#b8ff63";c.lineWidth=1.5;c.beginPath();c.ellipse(x,y,r*.8,r*.26,0,0,Math.PI*2);c.stroke();
+      c.beginPath();for(let a=0;a<=24;a++){const ang=a/24*Math.PI*2,w=1+.12*Math.sin(ang*3+now/390)+.07*Math.cos(ang*5-now/510),px=x+Math.cos(ang)*r*w,py=y+Math.sin(ang)*r*.34*w;if(a===0)c.moveTo(px,py);else c.lineTo(px,py);}c.closePath();c.fill();
+      c.globalAlpha=.85;c.strokeStyle="#b8ff63";c.lineWidth=1.5;c.beginPath();for(let a=0;a<=24;a++){const ang=a/24*Math.PI*2,w=.78+.07*Math.sin(ang*3+now/390),px=x+Math.cos(ang)*r*w,py=y+Math.sin(ang)*r*.25*w;if(a===0)c.moveTo(px,py);else c.lineTo(px,py);}c.closePath();c.stroke();
       for(let b=0;b<3;b++){const bx=x+Math.sin(now/330+b*2.2)*r*.55,by=y+Math.cos(now/410+b*1.8)*r*.2-Math.abs(Math.sin(now/280+b))*r*.18;c.globalAlpha=.7;c.fillStyle="#d9ff9a";c.beginPath();c.arc(bx,by,Math.max(1,1.3*pL.zoom),0,Math.PI*2);c.fill();}
       c.restore();
     }
@@ -98,7 +99,7 @@ function __wzmAcidDraw(){
   __wzmAcidFrame=requestAnimationFrame(__wzmAcidDraw);
 }
 __wzmAcidFrame=requestAnimationFrame(__wzmAcidDraw);
-BS("acid",{name:r("Кислота"),icon:"drop",hint:r("Удерживайте — разливает зелёную кислоту. Она растворяет сталь, чугун и свинец; житель долго не выживет в луже."),slider:{label:r("Поток"),min:1,max:10,def:5,fmt:t=>r(\`\${t*5} л/с\`)},acc:0,down(t){__wzmAcidPool(t.wx,t.wy,20+this.value*1.8);this.acc=0;},update(t){if(!IS.down)return;this.acc+=t*(2+this.value*.8);while(this.acc>=.12){this.acc-=.12;__wzmAcidPool(IS.wx+B(-4,4),IS.wy+B(-3,3),15+this.value*1.8);}},draw(t){if(!IS.over)return;t.strokeStyle="rgba(72,255,53,.85)";t.fillStyle="rgba(72,255,53,.14)";t.lineWidth=2/pL.zoom;t.beginPath();t.ellipse(IS.wx,IS.wy,20+this.value*1.8,8+this.value*.8,0,0,Math.PI*2);t.fill();t.stroke();}});`;
+BS("acid",{name:r("Кислота"),icon:"acid",hint:r("Удерживайте — льётся зелёная кислота. Разъедает дерево, кирпич, бетон и гипсокартон; металл, стекло и камень не трогает."),slider:{label:r("Поток"),min:1,max:10,def:5,fmt:t=>r(\`\${t*5} л/с\`)},acc:0,down(t){__wzmAcidPool(t.wx,t.wy,20+this.value*1.8);this.acc=0;},update(t){if(!IS.down)return;this.acc+=t*(2+this.value*.8);while(this.acc>=.12){this.acc-=.12;__wzmAcidPool(IS.wx+B(-4,4),IS.wy+B(-3,3),15+this.value*1.8);}},draw(t){if(!IS.over)return;t.strokeStyle="rgba(72,255,53,.85)";t.fillStyle="rgba(72,255,53,.14)";t.lineWidth=2/pL.zoom;t.beginPath();t.ellipse(IS.wx,IS.wy,20+this.value*1.8,8+this.value*.8,0,0,Math.PI*2);t.fill();t.stroke();}});`;
         if (source.includes(acidToolAnchor)) source = source.replace(acidToolAnchor, acidToolCode + acidToolAnchor);
         source = source.replace('const CA=["camera","hammer","ball","winch","dynamite","demolish","bomb","nuke","rocket","flame","molotov","lava","water","laser"',
           'const CA=["camera","hammer","ball","winch","dynamite","demolish","bomb","nuke","rocket","flame","molotov","lava","water","acid","laser"');
