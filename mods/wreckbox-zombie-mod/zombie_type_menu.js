@@ -26,6 +26,82 @@
           't.hp=Math.max(t.hp,70),t.blood=Math.max(t.blood,60),t.bleed=Math.min(t.bleed,.15),t.look.helmet=t.look.helmet&&Math.random()<.5,(function(z){const c=' + cfg + ';if(c.hpMultiplier)z.hp=Math.max(70,z.hp)*c.hpMultiplier;if(c.bodyColor){z.look.shirt=c.bodyColor;z.look.pants=c.pantsColor||c.bodyColor;z.look.skin=c.skinColor||z.look.skin;z.look.hair=c.hairColor||z.look.hair;z.look.helmet=!!c.helmet;z.look.helmCol=c.helmetColor||c.bodyColor;}})(t),yT.n++');
         // The base game excludes zombies from GT's target search. Let fast
         // variants attack ordinary zombies, and let fire variants breathe fire.
+        const acidToolAnchor = 'BS("volcano",{name:r("Вулкан")';
+        const acidToolCode = \`const __wzmAcidPools=[];
+function __wzmAcidPool(x,y,r=25){__wzmAcidPools.push({x,y,r,until:$t+60,next:0});}
+const __wzmAcidCanvas=document.createElement("canvas");
+__wzmAcidCanvas.id="wzm-acid-overlay";
+__wzmAcidCanvas.style.cssText="position:fixed;pointer-events:none;z-index:900;display:block";
+document.body.appendChild(__wzmAcidCanvas);
+const __wzmAcidCtx=__wzmAcidCanvas.getContext("2d");
+let __wzmAcidFrame=0;
+function __wzmAcidDraw(){
+  const mainCanvas=document.querySelector("canvas:not(#wzm-acid-overlay)");
+  if(mainCanvas){
+    const rect=mainCanvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+    __wzmAcidCanvas.style.left=rect.left+"px";__wzmAcidCanvas.style.top=rect.top+"px";
+    __wzmAcidCanvas.style.width=rect.width+"px";__wzmAcidCanvas.style.height=rect.height+"px";
+    if(__wzmAcidCanvas.width!==Math.round(rect.width*dpr)||__wzmAcidCanvas.height!==Math.round(rect.height*dpr)){
+      __wzmAcidCanvas.width=Math.max(1,Math.round(rect.width*dpr));__wzmAcidCanvas.height=Math.max(1,Math.round(rect.height*dpr));
+    }
+    const c=__wzmAcidCtx;c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,rect.width,rect.height);
+    const sx=x=>rect.width/2+(x-pL.x)*pL.zoom,sy=y=>rect.height/2+(y-pL.y)*pL.zoom;
+    const now=performance.now();
+    for(let i=__wzmAcidPools.length-1;i>=0;i--){
+      const p=__wzmAcidPools[i];if(p.until<$t){__wzmAcidPools.splice(i,1);continue;}
+      if($t>=p.next){
+        p.next=$t+.35;
+        const cx=Math.floor(p.x/6),cy=Math.floor(p.y/6),rad=Math.ceil(p.r/6);
+        for(let yy=-rad;yy<=rad;yy++)for(let xx=-rad;xx<=rad;xx++){
+          if(xx*xx+yy*yy>rad*rad)continue;
+          const col=cx+xx,row=cy+yy;if(!ne(col,row))continue;
+          const cell=row*u+col,mat=gt[cell];
+          if(mat&&(mat===4||mat===nt||mat===et)&&!st[mat].indestructible)ue(cell,0,0,0);
+        }
+        for(const npc of mm){
+          if(npc.gone||npc.dead||npc.hidden||npc.__wzmSkeleton)continue;
+          if(Math.hypot(npc.x-p.x,(npc.y-8)-p.y)>p.r+5)continue;
+          if(npc.__wzmAcidSince===undefined)npc.__wzmAcidSince=$t;
+          if($t-npc.__wzmAcidSince>1.4){
+            npc.__wzmSkeleton=true;npc.__wzmSkeletonAt=$t;npc.__wzmSkeletonX=npc.x;npc.__wzmSkeletonY=npc.y;
+            gx(npc,"acid");npc.gone=true;
+          }
+        }
+      }
+      const x=sx(p.x),y=sy(p.y),r=p.r*pL.zoom;
+      if(x+r<-10||x-r>rect.width+10||y+r<-10||y-r>rect.height+10)continue;
+      c.save();c.globalAlpha=.55;c.fillStyle="#48ff35";c.shadowColor="#38ff00";c.shadowBlur=12;
+      c.beginPath();c.ellipse(x,y,r,r*.38,0,0,Math.PI*2);c.fill();
+      c.globalAlpha=.85;c.strokeStyle="#b8ff63";c.lineWidth=1.5;c.beginPath();c.ellipse(x,y,r*.8,r*.26,0,0,Math.PI*2);c.stroke();
+      for(let b=0;b<3;b++){const bx=x+Math.sin(now/330+b*2.2)*r*.55,by=y+Math.cos(now/410+b*1.8)*r*.2-Math.abs(Math.sin(now/280+b))*r*.18;c.globalAlpha=.7;c.fillStyle="#d9ff9a";c.beginPath();c.arc(bx,by,Math.max(1,1.3*pL.zoom),0,Math.PI*2);c.fill();}
+      c.restore();
+    }
+    for(const npc of mm){
+      if(!npc.__wzmSkeleton)continue;
+      const x=sx(npc.__wzmSkeletonX),y=sy(npc.__wzmSkeletonY),z=pL.zoom;
+      if(x<-60||x>rect.width+60||y<-60||y>rect.height+60)continue;
+      const age=Math.max(0,$t-npc.__wzmSkeletonAt),phase=now/260+(npc.id||0),collapse=Math.max(0,1-age/1.8);
+      const bob=Math.sin(phase)*1.2*(1-collapse)+collapse*8;
+      const arm=Math.sin(phase)*.24,leg=Math.cos(phase)*.22;
+      c.save();c.translate(x,y-bob*z);c.scale(z,z);c.lineCap="round";c.lineJoin="round";
+      c.strokeStyle="#e1e7c8";c.fillStyle="#e1e7c8";c.lineWidth=1.65;c.shadowColor="#a8ff7b";c.shadowBlur=4;
+      c.beginPath();c.arc(0,-24,4.2,0,Math.PI*2);c.fill();
+      c.fillStyle="#28451d";c.beginPath();c.arc(-1.5,-24,1,0,Math.PI*2);c.arc(1.5,-24,1,0,Math.PI*2);c.fill();
+      c.strokeStyle="#e1e7c8";c.beginPath();c.moveTo(0,-19.5);c.lineTo(0,-8);c.moveTo(-3,-17);c.lineTo(3,-17);c.moveTo(-3.5,-14);c.lineTo(3.5,-14);c.moveTo(-3.2,-11);c.lineTo(3.2,-11);
+      c.moveTo(0,-8);c.lineTo(-4,-5);c.lineTo(0,-3);c.lineTo(4,-5);c.lineTo(0,-8);
+      c.moveTo(-1,-17);c.lineTo(-6*Math.cos(arm),-12+3*Math.sin(arm));c.lineTo(-8*Math.cos(arm),-7+3*Math.sin(arm));
+      c.moveTo(1,-17);c.lineTo(6*Math.cos(arm),-12-3*Math.sin(arm));c.lineTo(8*Math.cos(arm),-7-3*Math.sin(arm));
+      c.moveTo(-2,-4);c.lineTo(-3-3*Math.sin(leg),4);c.lineTo(-4-4*Math.sin(leg),9);
+      c.moveTo(2,-4);c.lineTo(3+3*Math.sin(leg),4);c.lineTo(4+4*Math.sin(leg),9);c.stroke();c.restore();
+    }
+  }
+  __wzmAcidFrame=requestAnimationFrame(__wzmAcidDraw);
+}
+__wzmAcidFrame=requestAnimationFrame(__wzmAcidDraw);
+BS("acid",{name:r("Кислота"),icon:"drop",hint:r("Удерживайте — разливает зелёную кислоту. Она растворяет сталь, чугун и свинец; житель долго не выживет в луже."),slider:{label:r("Поток"),min:1,max:10,def:5,fmt:t=>r(\`\${t*5} л/с\`)},acc:0,down(t){__wzmAcidPool(t.wx,t.wy,20+this.value*1.8);this.acc=0;},update(t){if(!IS.down)return;this.acc+=t*(2+this.value*.8);while(this.acc>=.12){this.acc-=.12;__wzmAcidPool(IS.wx+B(-4,4),IS.wy+B(-3,3),15+this.value*1.8);}},draw(t){if(!IS.over)return;t.strokeStyle="rgba(72,255,53,.85)";t.fillStyle="rgba(72,255,53,.14)";t.lineWidth=2/pL.zoom;t.beginPath();t.ellipse(IS.wx,IS.wy,20+this.value*1.8,8+this.value*.8,0,0,Math.PI*2);t.fill();t.stroke();}});\`;
+        if (source.includes(acidToolAnchor)) source = source.replace(acidToolAnchor, acidToolCode + acidToolAnchor);
+        source = source.replace('const CA=["camera","hammer","ball","winch","dynamite","demolish","bomb","nuke","rocket","flame","molotov","lava","water","laser"',
+          'const CA=["camera","hammer","ball","winch","dynamite","demolish","bomb","nuke","rocket","flame","molotov","lava","water","acid","laser"');
         const targetFilter = 'if(!ET(i)||i===e.skip)continue;';
         if (source.includes(targetFilter)) {
           source = source.replace(targetFilter,
