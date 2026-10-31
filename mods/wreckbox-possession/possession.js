@@ -16,15 +16,14 @@
           clearTimeout(this.verticalReleaseTimers[key]);
           this.verticalReleaseTimers[key] = null;
         }
-        this.setKey(key, true);
+        this.keys[key] = true;
         return;
       }
-      // Keep a quick W/S tap visible to the game loop long enough to start
-      // the stair route. The NPC then follows that route independently.
+      // A short W/S tap must survive long enough for the game loop to start a stair route.
       if ((key === 'up' || key === 'down') && this.keys[key]) {
         clearTimeout(this.verticalReleaseTimers[key]);
         this.verticalReleaseTimers[key] = setTimeout(() => {
-          this.setKey(key, false);
+          this.keys[key] = false;
           this.verticalReleaseTimers[key] = null;
         }, 120);
       } else {
@@ -36,14 +35,14 @@
         clearTimeout(this.verticalReleaseTimers[k]);
         this.verticalReleaseTimers[k] = null;
       });
-      this.clearKeys();
+      Object.keys(this.keys).forEach(k => { this.keys[k] = false; });
     },
     enter(npc) {
       if (!npc || npc.gone || npc.dead || npc.rag || npc.zomb || npc.hidden || npc.sc) return false;
       if (this.active) this.release();
       this.npc = npc;
       this.active = true;
-      Object.keys(this.keys).forEach(k => this.keys[k] = false);
+      this.clearKeys();
       npc.__wzmPossessed = true;
       npc.__wzmMoveDir = '';
       npc.act = null;
@@ -62,7 +61,7 @@
       if (!this.active) return;
       const npc = this.npc;
       this.active = false;
-      Object.keys(this.keys).forEach(k => this.keys[k] = false);
+      this.clearKeys();
       if (npc) {
         npc.__wzmMoveDir = '';
         if (npc.sc) {
@@ -97,7 +96,7 @@
       const key = map[e.code];
       if (!key) return;
       e.preventDefault(); e.stopImmediatePropagation();
-      this.keys[key] = true;
+      this.setKey(key, true);
     },
     keyup(e) {
       if (!this.active) return;
@@ -109,7 +108,7 @@
       const key = map[e.code];
       if (!key) return;
       e.preventDefault(); e.stopImmediatePropagation();
-      this.keys[key] = false;
+      this.setKey(key, false);
     }
   };
   window.__WRECKBOX_POSSESSION__ = controller;
@@ -166,7 +165,7 @@
     const touchDevice=()=>window.matchMedia('(pointer:coarse)').matches;
     root.querySelectorAll('[data-key]').forEach(btn=>{
       const key=btn.dataset.key;
-      const down=e=>{e.preventDefault();if(!controller.active)return;controller.keys[key]=true;try{btn.setPointerCapture(e.pointerId);}catch(_){}};
+      const down=e=>{e.preventDefault();if(!controller.active)return;controller.setKey(key,true);try{btn.setPointerCapture(e.pointerId);}catch(_){}};
       const up=e=>{e.preventDefault();controller.setKey(key,false);};
       btn.addEventListener('pointerdown',down);
       ['pointerup','pointercancel','lostpointercapture','pointerleave'].forEach(ev=>btn.addEventListener(ev,up));
