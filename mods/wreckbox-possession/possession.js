@@ -9,6 +9,35 @@
     npc: null,
     camera: null,
     keys: { left:false, right:false, up:false, down:false, run:false },
+    verticalReleaseTimers: { up:null, down:null },
+    setKey(key, pressed) {
+      if (pressed) {
+        if (key === 'up' || key === 'down') {
+          clearTimeout(this.verticalReleaseTimers[key]);
+          this.verticalReleaseTimers[key] = null;
+        }
+        this.setKey(key, true);
+        return;
+      }
+      // Keep a quick W/S tap visible to the game loop long enough to start
+      // the stair route. The NPC then follows that route independently.
+      if ((key === 'up' || key === 'down') && this.keys[key]) {
+        clearTimeout(this.verticalReleaseTimers[key]);
+        this.verticalReleaseTimers[key] = setTimeout(() => {
+          this.setKey(key, false);
+          this.verticalReleaseTimers[key] = null;
+        }, 120);
+      } else {
+        this.keys[key] = false;
+      }
+    },
+    clearKeys() {
+      Object.keys(this.verticalReleaseTimers).forEach(k => {
+        clearTimeout(this.verticalReleaseTimers[k]);
+        this.verticalReleaseTimers[k] = null;
+      });
+      this.clearKeys();
+    },
     enter(npc) {
       if (!npc || npc.gone || npc.dead || npc.rag || npc.zomb || npc.hidden || npc.sc) return false;
       if (this.active) this.release();
@@ -75,7 +104,7 @@
       const map = {
         ArrowLeft:'left', KeyA:'left', ArrowRight:'right', KeyD:'right',
         ArrowUp:'up', KeyW:'up', ArrowDown:'down', KeyS:'down',
-        ShiftLeft:'run', ShiftRight:'run', Space:'jump'
+        ShiftLeft:'run', ShiftRight:'run'
       };
       const key = map[e.code];
       if (!key) return;
@@ -118,7 +147,7 @@
   window.addEventListener('keydown', e => controller.keydown(e), true);
   window.addEventListener('keyup', e => controller.keyup(e), true);
   window.addEventListener('blur', () => {
-    Object.keys(controller.keys).forEach(k => controller.keys[k] = false);
+    controller.clearKeys();
   });
   // Minimal touch pad, enabled only on touch-sized/coarse-pointer devices.
   const mountTouchControls = () => {
@@ -138,7 +167,7 @@
     root.querySelectorAll('[data-key]').forEach(btn=>{
       const key=btn.dataset.key;
       const down=e=>{e.preventDefault();if(!controller.active)return;controller.keys[key]=true;try{btn.setPointerCapture(e.pointerId);}catch(_){}};
-      const up=e=>{e.preventDefault();controller.keys[key]=false;};
+      const up=e=>{e.preventDefault();controller.setKey(key,false);};
       btn.addEventListener('pointerdown',down);
       ['pointerup','pointercancel','lostpointercapture','pointerleave'].forEach(ev=>btn.addEventListener(ev,up));
     });
