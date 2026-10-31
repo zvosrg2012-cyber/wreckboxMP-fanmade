@@ -66,24 +66,23 @@
         let panel=document.getElementById(panelId);
         if(!lift){if(panel)panel.remove();return;}
         if(!panel){panel=document.createElement("div");panel.id=panelId;
-          panel.style.cssText="position:fixed;z-index:99999;right:22px;bottom:90px;display:flex;flex-direction:column;gap:5px;min-width:112px;padding:8px;background:#171b20;border:3px solid #697783;box-shadow:inset 0 0 0 2px #303a43,3px 3px 0 #080b0e;border-radius:2px;font:12px monospace;color:#dce8ee;image-rendering:pixelated";
+          panel.style.cssText="position:fixed;z-index:99999;right:24px;bottom:96px;display:flex;flex-direction:column;gap:12px;width:176px;padding:14px;background:linear-gradient(155deg,rgba(35,45,57,.97),rgba(13,19,27,.98));border:1px solid rgba(164,190,211,.28);border-radius:16px;box-shadow:0 14px 40px rgba(0,0,0,.42),inset 0 1px rgba(255,255,255,.08);font:12px system-ui,Arial,sans-serif;color:#edf5fb;backdrop-filter:blur(12px)";
           document.body.appendChild(panel);
         }
         if(panel.dataset.elevator!==String(lift.id)||panel.dataset.floor!==String(nearStop)){
           panel.dataset.elevator=String(lift.id);panel.dataset.floor=String(nearStop);panel.replaceChildren();
-          const head=document.createElement("div");head.textContent="ЛИФТ • ЭТАЖ "+(nearStop+1);
-          head.style.cssText="text-align:center;padding:4px 2px;color:#9eeaff;border-bottom:2px solid #596975;letter-spacing:1px";panel.appendChild(head);
-          const grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(3,1fr);gap:4px";
+          const head=document.createElement("div");head.textContent="ЛИФТ";
+          head.style.cssText="text-align:center;padding:2px 2px 10px;color:#a9c1d5;border-bottom:1px solid rgba(180,205,225,.2);font:600 11px system-ui;letter-spacing:2px;text-transform:uppercase";panel.appendChild(head);
+          const grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(3,1fr);gap:7px";
           lift.stops.forEach((stop,i)=>{
-            const button=document.createElement("button");button.type="button";button.textContent=String(i+1);button.title="Вызвать лифт на этаж "+(i+1);
-            button.style.cssText="height:30px;background:"+(i===nearStop?"#294d5b":"#252c33")+";color:"+(i===nearStop?"#a8f0ff":"#f0f4f6")+";border:2px solid #596975;border-radius:1px;box-shadow:inset 1px 1px #8998a2,2px 2px 0 #080b0e;font:bold 13px monospace;cursor:pointer";
+            const button=document.createElement("button");button.type="button";button.textContent=String(i+1);button.title="Перейти на этаж "+(i+1);
+            button.style.cssText="height:38px;background:"+(i===nearStop?"linear-gradient(145deg,#3c91b5,#24617f)":"rgba(255,255,255,.07)")+";color:#f4f8fb;border:1px solid "+(i===nearStop?"#72c8e9":"rgba(190,210,225,.18)")+";border-radius:9px;box-shadow:"+(i===nearStop?"0 3px 10px rgba(40,140,190,.25)":"inset 0 1px rgba(255,255,255,.06)")+";font:600 14px system-ui;cursor:pointer";
             button.addEventListener("click",()=>{const C=window.__WRECKBOX_POSSESSION__;if(!C||!C.active||!C.npc)return;const entry=(lift.stops[i].sides||[]).find(v=>v.seg&&!v.seg.dead);if(!entry){try{MR("На этот этаж сейчас нет доступа.");}catch(_){}return;}C.npc.nav=null;C.npc.act=null;if(!Wy(C.npc,entry.seg,entry.x,{run:false,haz:false})){try{MR("Лифт не отвечает.");}catch(_){}}});
             grid.appendChild(button);
           });
-          panel.appendChild(grid);const foot=document.createElement("div");foot.textContent="НАЖМИТЕ ЭТАЖ";foot.style.cssText="text-align:center;color:#82939e;font:10px monospace;letter-spacing:1px";panel.appendChild(foot);
+          panel.appendChild(grid);const foot=document.createElement("div");foot.textContent="ВЫБЕРИТЕ ЭТАЖ";foot.style.cssText="text-align:center;color:#91a5b6;font:10px system-ui;letter-spacing:1.5px";panel.appendChild(foot);
         }
       },
-      draw(ctx){const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q)return;const z=Math.max(.5,pL.zoom);ctx.save();ctx.textAlign="center";ctx.textBaseline="bottom";ctx.font="bold "+(12/z)+"px Arial";ctx.lineWidth=3/z;ctx.strokeStyle="#101820";ctx.fillStyle="#ffffff";ctx.strokeText("ВЫ",q.x,q.y-88/z);ctx.fillText("ВЫ",q.x,q.y-38/z);ctx.beginPath();ctx.moveTo(q.x-5/z,q.y-83/z);ctx.lineTo(q.x+5/z,q.y-34/z);ctx.lineTo(q.x,q.y-73/z);ctx.closePath();ctx.fillStyle="#8de7ff";ctx.fill();ctx.restore();}
     });
     window.addEventListener("wzm-possession-door",()=>{
       const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q)return;
