@@ -134,7 +134,7 @@
       #wzm-touch-controls .wzm-interact{pointer-events:auto;width:48px;height:48px;font-size:17px}
     `;
     document.head.appendChild(style);document.body.appendChild(root);
-    const touchDevice=()=>window.matchMedia('(pointer:coarse), (max-width:800px)').matches;
+    const touchDevice=()=>window.matchMedia('(pointer:coarse)').matches;
     root.querySelectorAll('[data-key]').forEach(btn=>{
       const key=btn.dataset.key;
       const down=e=>{e.preventDefault();if(!controller.active)return;controller.keys[key]=true;try{btn.setPointerCapture(e.pointerId);}catch(_){}};
