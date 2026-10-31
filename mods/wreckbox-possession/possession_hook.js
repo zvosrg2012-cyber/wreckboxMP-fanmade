@@ -115,18 +115,25 @@
       if(t.nav){n=Vy(t,e);}
       else if(vert){
         const cur=Vg(t.x,t.y);let dest=null,targetX=t.x,best=1e9;
-        // Find the nearest stair endpoint in the requested vertical direction.
-        // NPCs can approach the stair automatically instead of requiring exact positioning.
-        for(const edge of kg.links){
-          if(!edge||edge.dead||edge.type!=="stair"||!edge.a||!edge.b)continue;
-          const ends=[{node:edge.a,x:edge.ax,other:edge.b,otherX:edge.bx},{node:edge.b,x:edge.bx,other:edge.a,otherX:edge.ax}];
-          for(const ep of ends){
-            const dy=ep.other.y-ep.node.y;
-            if((vert<0&&dy>=-3)||(vert>0&&dy<=3))continue;
-            const dx=Math.abs(t.x-ep.x),dyHere=Math.abs(t.y-ep.node.y);
-            if(dx>115||dyHere>105)continue;
-            const cost=dx+dyHere*1.2+Math.abs(ep.otherX-ep.x)*.08;
-            if(cost<best){best=cost;dest=ep.other;targetX=ep.otherX;}
+        // Restore the original stair routing: choose a stair connected to the
+        // NPC's current segment, then use the ramp fallback below if needed.
+        if(cur){
+          for(const edge of cur.links){
+            if(edge.type==="stair"){
+              const other=edge.a===cur?edge.b:edge.a;
+              if(!other||(vert<0?other.y>=cur.y-4:other.y<=cur.y+4))continue;
+              const x=edge.a===cur?edge.bx:edge.ax;
+              const cost=Math.abs(other.y-cur.y)+Math.abs(x-t.x)*.45;
+              if(cost<best){best=cost;dest=other;targetX=x;}
+            }else if(edge.type==="elev"&&edge.elev){
+              for(const stop of kg.links){
+                if(stop.type!=="elev"||stop.elev!==edge.elev||!stop.a||stop.a===cur)continue;
+                const other=stop.a;
+                if(vert<0?other.y>=cur.y-4:other.y<=cur.y+4)continue;
+                const x=stop.ax,cost=Math.abs(other.y-cur.y)+Math.abs(x-t.x)*.45+12;
+                if(cost<best){best=cost;dest=other;targetX=x;}
+              }
+            }
           }
         }
         if(dest&&Wy(t,dest,targetX,{run:!!k.run,haz:!1})){n=Vy(t,e);}
