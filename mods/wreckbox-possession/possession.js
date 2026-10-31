@@ -48,6 +48,10 @@
       window.dispatchEvent(new Event('wzm-possession-release'));
       try { MR('Вы вышли из вселения.'); } catch (_) {}
     },
+    interact() {
+      if (!this.active || !this.npc) return;
+      window.dispatchEvent(new Event('wzm-possession-door'));
+    },
     keydown(e) {
       if (!this.active) return;
       const map = {
@@ -59,9 +63,7 @@
         e.preventDefault(); e.stopImmediatePropagation(); this.release(); return;
       }
       if (e.code === 'KeyE') {
-        e.preventDefault(); e.stopImmediatePropagation();
-        window.dispatchEvent(new Event('wzm-possession-door'));
-        return;
+        e.preventDefault(); e.stopImmediatePropagation(); this.interact(); return;
       }
       const key = map[e.code];
       if (!key) return;
@@ -119,4 +121,44 @@
   window.addEventListener('blur', () => {
     Object.keys(controller.keys).forEach(k => controller.keys[k] = false);
   });
+  // Touch controls are shown only while possessing an NPC.
+  const mountTouchControls = () => {
+    if (document.getElementById('wzm-touch-controls')) return;
+    const root = document.createElement('div');
+    root.id = 'wzm-touch-controls';
+    root.innerHTML = `
+      <div class="wzm-pad">
+        <button data-key="up" aria-label="Вверх">▲</button>
+        <div><button data-key="left" aria-label="Влево">◀</button><button data-key="down" aria-label="Вниз">▼</button><button data-key="right" aria-label="Вправо">▶</button></div>
+      </div>
+      <div class="wzm-actions">
+        <button data-key="run">БЕГ</button><button data-key="jump">ПРЫЖОК</button>
+        <button data-action="interact">E · ДВЕРЬ</button><button data-action="exit">ВЫХОД</button>
+      </div>`;
+    const style = document.createElement('style');
+    style.textContent = `
+      #wzm-touch-controls{display:none;position:fixed;z-index:100000;left:0;right:0;bottom:max(14px,env(safe-area-inset-bottom));padding:10px 14px;box-sizing:border-box;justify-content:space-between;align-items:flex-end;gap:12px;pointer-events:none;touch-action:none;user-select:none}
+      #wzm-touch-controls .wzm-pad,#wzm-touch-controls .wzm-actions{display:flex;flex-direction:column;gap:7px;pointer-events:auto}
+      #wzm-touch-controls .wzm-pad>div{display:flex;gap:7px}
+      #wzm-touch-controls .wzm-actions{display:grid;grid-template-columns:repeat(2,minmax(62px,1fr));max-width:210px}
+      #wzm-touch-controls button{min-width:48px;min-height:48px;padding:8px;border:1px solid rgba(255,255,255,.4);border-radius:12px;background:rgba(20,24,28,.78);color:#fff;font:700 13px Arial,sans-serif;touch-action:none;-webkit-user-select:none;user-select:none}
+      #wzm-touch-controls button:active{background:rgba(170,125,60,.95)}
+      @media(pointer:coarse),(max-width:800px){#wzm-touch-controls{display:flex}}
+    `;
+    document.head.appendChild(style); document.body.appendChild(root);
+    const clear = key => { if (controller.keys[key] !== undefined) controller.keys[key] = false; };
+    root.querySelectorAll('[data-key]').forEach(btn => {
+      const key=btn.dataset.key;
+      const down=e=>{e.preventDefault();if(!controller.active)return;if(key==='jump')controller.keys.jump=true;else controller.keys[key]=true;try{btn.setPointerCapture(e.pointerId);}catch(_){}};
+      const up=e=>{e.preventDefault();clear(key);};
+      btn.addEventListener('pointerdown',down);['pointerup','pointercancel','lostpointercapture','pointerleave'].forEach(ev=>btn.addEventListener(ev,up));
+    });
+    root.querySelector('[data-action="interact"]').addEventListener('click',()=>controller.interact());
+    root.querySelector('[data-action="exit"]').addEventListener('click',()=>controller.release());
+    const refresh=()=>{root.style.display=controller.active?'flex':'none';};
+    const timer=setInterval(()=>{refresh();if(!document.body.contains(root))clearInterval(timer);},180);
+    window.addEventListener('wzm-possession-release',refresh);
+    refresh();
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mountTouchControls,{once:true});else mountTouchControls();
 })();
