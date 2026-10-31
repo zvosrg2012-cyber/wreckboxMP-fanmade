@@ -104,8 +104,9 @@
       const P=window.__WRECKBOX_POSSESSION__,k=P.keys;
       if(t.__wzmReleaseAfterSc&&!t.sc){t.__wzmReleaseAfterSc=false;t.__wzmPossessed=false;t.nav=null;t.act=null;t.state="idle";t.lstate="idle";t.t=.2;}
       const dir=(k.right?1:0)-(k.left?1:0),vert=k.up?-1:k.down?1:0;
+      // Preserve the game's original stair/pathfinding mechanics; only track input changes.
       const mode=vert?(vert<0?"up":"down"):dir?(dir<0?"left":"right"):"";
-      if(mode!==t.__wzmMoveDir){t.nav=null;t.act=null;t.__wzmMoveDir=mode;}
+      if(mode!==t.__wzmMoveDir){t.__wzmMoveDir=mode;}
       t.pose="";t.act=null;t.t=999;t.blocked=0;
       if(t.nav){n=Vy(t,e);}
       else if(vert){
@@ -152,9 +153,9 @@
         t.state="walk";t.lstate="walk";t.dir=dir||t.dir;
       }else if(dir){
         t.dir=dir;t.state="walk";t.lstate="walk";
-        // Horizontal input must stay on the current floor; do not let pathfinding pull the NPC onto stairs.
-        t.nav=null;
-        n=k.run?t.runSpd:t.spd;
+        const cur=Vg(t.x,t.y),tx=F(t.x+dir*120,8,m-8),target=Vg(tx,t.y)||Og(tx);
+        if(cur&&target&&cur!==target&&Wy(t,target,tx,{run:!!k.run,haz:!1}))n=Vy(t,e);
+        else n=k.run?t.runSpd:t.spd;
       }else{
         t.state="idle";t.lstate="idle";t.vx=0;n=0;
       }
