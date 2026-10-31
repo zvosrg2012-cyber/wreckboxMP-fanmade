@@ -46,7 +46,7 @@
         P.camera={x:pL.x,y:pL.y};if(P.enter(best))MR(r("Вы вселились в NPC. Нажмите E для выхода."),!0);
       },
       update(){const P=window.__WRECKBOX_POSSESSION__;if(P&&P.active&&(!P.npc||P.npc.gone||P.npc.dead||P.npc.rag))P.release();},
-      draw(ctx){const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q)return;ctx.save();ctx.strokeStyle="#8de7ff";ctx.lineWidth=2/Math.max(.5,pL.zoom);ctx.setLineDash([5/Math.max(.5,pL.zoom),4/Math.max(.5,pL.zoom)]);ctx.beginPath();ctx.ellipse(q.x,q.y-12,13,24,0,0,Math.PI*2);ctx.stroke();ctx.restore();}
+      draw(ctx){const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q)return;const z=Math.max(.5,pL.zoom);ctx.save();ctx.textAlign="center";ctx.textBaseline="bottom";ctx.font=`bold ${12/z}px Arial`;ctx.lineWidth=3/z;ctx.strokeStyle="#101820";ctx.fillStyle="#ffffff";ctx.strokeText("ВЫ",q.x,q.y-38/z);ctx.fillText("ВЫ",q.x,q.y-38/z);ctx.beginPath();ctx.moveTo(q.x-5/z,q.y-34/z);ctx.lineTo(q.x+5/z,q.y-34/z);ctx.lineTo(q.x,q.y-25/z);ctx.closePath();ctx.fillStyle="#8de7ff";ctx.fill();ctx.restore();}
     });window.addEventListener("wzm-possession-release",()=>{const P=window.__WRECKBOX_POSSESSION__;if(P&&P.camera){pL.x=P.camera.x;pL.y=P.camera.y;P.camera=null;}});const WS=`;
     replaceOnce(toolMarker, toolMarker.replace('const WS=', toolCode), 'tool registration');
 
