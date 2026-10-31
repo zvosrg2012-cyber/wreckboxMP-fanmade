@@ -31,7 +31,7 @@
     const toolMarker = 'BS("camera",{name:r("Камера"),icon:"move",hint:r("Перетаскивайте вид. Колесо или щипок — зум."),mode:"both"});const WS=';
     const toolCode = `BS("possession",{
       name:r("Вселение"),icon:"possession",
-      hint:r("Кликните по человеку. WASD — движение, W/S — лестницы и лифт, Shift — бег, Space — прыжок, E — выход."),
+      hint:r("Кликните по человеку. A/D — движение, W/S — лестницы и лифт, Shift — бег, E — дверь, Esc — выход."),
       down(t){
         const P=window.__WRECKBOX_POSSESSION__;
         if(!P)return;
@@ -106,8 +106,9 @@
       const dir=(k.right?1:0)-(k.left?1:0),vert=k.up?-1:k.down?1:0;
       const mode=vert?(vert<0?"up":"down"):dir?(dir<0?"left":"right"):"";
       if(mode!==t.__wzmMoveDir){
-        // Keep an active stair/elevator route when the input changes from idle to W/S.
-        if(!vert&&!dir){t.nav=null;t.act=null;}
+        // Horizontal input always takes priority over an unfinished stair route.
+        if(dir){t.nav=null;t.act=null;}
+        else if(!vert){t.nav=null;t.act=null;}
         t.__wzmMoveDir=mode;
       }
       t.pose="";t.t=999;t.blocked=0;
