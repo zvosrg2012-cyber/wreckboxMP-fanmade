@@ -66,21 +66,21 @@
         let panel=document.getElementById(panelId);
         if(!lift){if(panel)panel.remove();return;}
         if(!panel){panel=document.createElement("div");panel.id=panelId;
-          panel.style.cssText="position:fixed;z-index:99999;right:22px;bottom:90px;display:flex;flex-direction:column;gap:4px;min-width:108px;padding:6px;background:rgba(24,24,24,.94);border:1px solid #555;border-radius:0;font:12px Arial,sans-serif;color:#eee;box-shadow:2px 2px 0 rgba(0,0,0,.45)";
+          panel.style.cssText="position:fixed;z-index:99999;right:22px;bottom:90px;display:flex;flex-direction:column;gap:5px;min-width:122px;padding:7px;background:rgba(20,20,20,.88);border:1px solid rgba(230,220,200,.28);border-radius:3px;font:12px Arial,sans-serif;color:#eee;box-shadow:0 3px 12px rgba(0,0,0,.38)";
           document.body.appendChild(panel);
         }
         if(panel.dataset.elevator!==String(lift.id)||panel.dataset.floor!==String(nearStop)){
           panel.dataset.elevator=String(lift.id);panel.dataset.floor=String(nearStop);panel.replaceChildren();
           const head=document.createElement("div");head.textContent="ЛИФТ • ЭТАЖ "+(nearStop+1);
-          head.style.cssText="text-align:center;padding:4px 2px;color:#eee;border-bottom:1px solid #555;letter-spacing:.5px;font-weight:bold";panel.appendChild(head);
-          const grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(3,1fr);gap:4px";
+          head.style.cssText="text-align:center;padding:5px 3px;color:#f1eee8;border-bottom:1px solid rgba(230,220,200,.24);letter-spacing:1px;font-weight:700;text-shadow:0 1px 1px #000";panel.appendChild(head);
+          const grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:2px 0";
           lift.stops.forEach((stop,i)=>{
             const button=document.createElement("button");button.type="button";button.textContent=String(i+1);button.title="Вызвать лифт на этаж "+(i+1);
-            button.style.cssText="height:28px;background:"+(i===nearStop?"#a87936":"#303030")+";color:"+(i===nearStop?"#17130d":"#eee")+";border:1px solid "+(i===nearStop?"#d0a45e":"#666")+";border-radius:0;box-shadow:none;font:bold 13px Arial,sans-serif;cursor:pointer";
+            button.style.cssText="height:29px;background:"+(i===nearStop?"#b18445":"rgba(255,255,255,.07)")+";color:"+(i===nearStop?"#17130d":"#eee")+";border:1px solid "+(i===nearStop?"#d0ad70":"rgba(230,220,200,.24)")+";border-radius:2px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06);font:600 13px Arial,sans-serif;cursor:pointer";
             button.addEventListener("click",()=>{const C=window.__WRECKBOX_POSSESSION__;if(!C||!C.active||!C.npc)return;const entry=(lift.stops[i].sides||[]).find(v=>v.seg&&!v.seg.dead);if(!entry){try{MR("На этот этаж сейчас нет доступа.");}catch(_){}return;}C.npc.nav=null;C.npc.act=null;if(!Wy(C.npc,entry.seg,entry.x,{run:false,haz:false})){try{MR("Лифт не отвечает.");}catch(_){}}});
-            grid.appendChild(button);
+            button.addEventListener("mouseenter",()=>{if(i!==nearStop)button.style.background="rgba(255,255,255,.15)";});button.addEventListener("mouseleave",()=>{if(i!==nearStop)button.style.background="rgba(255,255,255,.07)";});grid.appendChild(button);
           });
-          panel.appendChild(grid);const foot=document.createElement("div");foot.textContent="НАЖМИТЕ ЭТАЖ";foot.style.cssText="text-align:center;color:#aaa;font:9px Arial,sans-serif;letter-spacing:.4px";panel.appendChild(foot);
+          panel.appendChild(grid);const foot=document.createElement("div");foot.textContent="НАЖМИТЕ ЭТАЖ";foot.style.cssText="text-align:center;color:#aaa;font:9px Arial,sans-serif;letter-spacing:1px";panel.appendChild(foot);
         }
       },
 
@@ -109,22 +109,24 @@
       t.pose="";t.act=null;t.t=999;t.blocked=0;
       if(t.nav){n=Vy(t,e);}
       else if(vert){
-        const cur=Vg(t.x,t.y);let dest=null,targetX=t.x,best=1e9;
+        const cur=Vg(t.x,t.y);let dest=null,targetX=t.x,bestElev=1e9,bestStair=1e9,stairDest=null,stairX=t.x;
         if(cur){
+          // If a usable lift connects this floor to the requested direction, prefer it over stairs.
           for(const edge of cur.links){
-            if(edge.type==="stair"){
+            if(edge.type==="elev"&&edge.elev){
+              for(const stop of kg.links){if(stop.type!=="elev"||stop.elev!==edge.elev||!stop.a||stop.a===cur)continue;
+                const other=stop.a;if(vert<0?other.y>=cur.y-4:other.y<=cur.y+4)continue;
+                const x=stop.ax,cost=Math.abs(other.y-cur.y)+Math.abs(x-t.x)*.45;
+                if(cost<bestElev){bestElev=cost;dest=other;targetX=x;}
+              }
+            }else if(edge.type==="stair"){
               const other=edge.a===cur?edge.b:edge.a;
               if(!other||(vert<0?other.y>=cur.y-4:other.y<=cur.y+4))continue;
               const x=edge.a===cur?edge.bx:edge.ax,cost=Math.abs(other.y-cur.y)+Math.abs(x-t.x)*.45;
-              if(cost<best){best=cost;dest=other;targetX=x;}
-            }else if(edge.type==="elev"&&edge.elev){
-              for(const stop of kg.links){if(stop.type!=="elev"||stop.elev!==edge.elev||!stop.a||stop.a===cur)continue;
-                const other=stop.a;if(vert<0?other.y>=cur.y-4:other.y<=cur.y+4)continue;
-                const x=stop.ax,cost=Math.abs(other.y-cur.y)+Math.abs(x-t.x)*.45+12;
-                if(cost<best){best=cost;dest=other;targetX=x;}
-              }
+              if(cost<bestStair){bestStair=cost;stairDest=other;stairX=x;}
             }
           }
+          if(!dest&&stairDest){dest=stairDest;targetX=stairX;}
         }
         if(dest&&Wy(t,dest,targetX,{run:!!k.run,haz:!1})){n=Vy(t,e);}
         else if(cur){
@@ -150,9 +152,9 @@
         t.state="walk";t.lstate="walk";t.dir=dir||t.dir;
       }else if(dir){
         t.dir=dir;t.state="walk";t.lstate="walk";
-        const cur=Vg(t.x,t.y),tx=F(t.x+dir*120,8,m-8),target=Vg(tx,t.y)||Og(tx);
-        if(cur&&target&&cur!==target&&Wy(t,target,tx,{run:!!k.run,haz:!1}))n=Vy(t,e);
-        else n=k.run?t.runSpd:t.spd;
+        // Horizontal input must stay on the current floor; do not let pathfinding pull the NPC onto stairs.
+        t.nav=null;
+        n=k.run?t.runSpd:t.spd;
       }else{
         t.state="idle";t.lstate="idle";t.vx=0;n=0;
       }
