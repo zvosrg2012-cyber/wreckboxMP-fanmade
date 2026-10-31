@@ -35,12 +35,14 @@
       this.active = false;
       Object.keys(this.keys).forEach(k => this.keys[k] = false);
       if (npc) {
-        npc.__wzmPossessed = false;
         npc.__wzmMoveDir = '';
-        if (!npc.sc) { npc.nav = null; npc.act = null; }
-        npc.state = 'idle';
-        npc.lstate = 'idle';
-        npc.t = .2;
+        if (npc.sc) {
+          npc.__wzmReleaseAfterSc = true;
+        } else {
+          npc.__wzmPossessed = false;
+          npc.nav = null; npc.act = null;
+          npc.state = 'idle'; npc.lstate = 'idle'; npc.t = .2;
+        }
       }
       this.npc = null;
       window.dispatchEvent(new Event('wzm-possession-release'));
