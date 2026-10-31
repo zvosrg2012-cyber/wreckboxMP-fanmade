@@ -88,21 +88,30 @@
         let panel=document.getElementById(panelId);
         if(!lift){if(panel)panel.remove();return;}
         if(!panel){panel=document.createElement("div");panel.id=panelId;
-          panel.style.cssText="position:fixed;z-index:99999;right:24px;bottom:96px;display:flex;flex-direction:column;gap:12px;width:176px;padding:14px;background:rgba(30,31,30,.94);border:1px solid rgba(205,198,178,.28);border-radius:5px;box-shadow:0 5px 18px rgba(0,0,0,.38),inset 0 1px rgba(255,255,255,.05);font:12px Arial,sans-serif;color:#e5e0d4";
+          // "panel" is the game's own frame class; .wzm-lift (see possession.js) adds placement and the hazard stripe.
+          panel.className="panel wzm-lift";panel.setAttribute("role","group");panel.setAttribute("aria-label","Лифт");
           document.body.appendChild(panel);
         }
         if(panel.dataset.elevator!==String(lift.id)||panel.dataset.floor!==String(nearStop)){
           panel.dataset.elevator=String(lift.id);panel.dataset.floor=String(nearStop);panel.replaceChildren();
-          const head=document.createElement("div");head.textContent="ЛИФТ";
-          head.style.cssText="text-align:center;padding:2px 2px 10px;color:#c4bda9;border-bottom:1px solid rgba(205,198,178,.18);font:600 11px Arial;letter-spacing:1.5px;text-transform:uppercase";panel.appendChild(head);
-          const grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(3,1fr);gap:7px";
-          lift.stops.forEach((stop,i)=>{
-            const button=document.createElement("button");button.type="button";button.textContent=String(i+1);button.title="Перейти на этаж "+(i+1);
-            button.style.cssText="height:38px;background:"+(i===nearStop?"#77705f":"rgba(255,255,255,.045)")+";color:"+(i===nearStop?"#fff9e9":"#d8d3c7")+";border:1px solid "+(i===nearStop?"#a69b80":"rgba(205,198,178,.17)")+";border-radius:4px;box-shadow:"+(i===nearStop?"inset 0 1px rgba(255,255,255,.16)":"none")+";font:600 14px Arial;cursor:pointer";
+          // Floors are numbered by height (a larger row is lower on screen), lowest = 1, and drawn top floor first like a real panel.
+          const order=lift.stops.map((s,i)=>i).sort((a,b)=>(lift.stops[b].row||0)-(lift.stops[a].row||0));
+          const floorOf={};order.forEach((idx,n)=>{floorOf[idx]=n+1;});
+          const head=document.createElement("div");head.className="wzm-lift__head";
+          const title=document.createElement("span");title.textContent="Лифт";
+          const here=document.createElement("b");here.textContent=String(floorOf[nearStop]);here.title="Текущий этаж";
+          head.appendChild(title);head.appendChild(here);panel.appendChild(head);
+          const grid=document.createElement("div");grid.className="wzm-lift__grid";
+          order.slice().reverse().forEach(i=>{
+            const current=i===nearStop;
+            const button=document.createElement("button");button.type="button";button.className="wzm-lift__btn";button.textContent=String(floorOf[i]);
+            button.title=current?"Вы на этом этаже":"Перейти на этаж "+floorOf[i];button.setAttribute("aria-label",button.title);
+            if(current){button.setAttribute("aria-current","true");button.disabled=true;}
             button.addEventListener("click",()=>{const C=window.__WRECKBOX_POSSESSION__;if(!C||!C.active||!C.npc)return;const entry=(lift.stops[i].sides||[]).find(v=>v.seg&&!v.seg.dead);if(!entry){try{MR("На этот этаж сейчас нет доступа.");}catch(_){}return;}C.npc.nav=null;C.npc.act=null;if(!Wy(C.npc,entry.seg,entry.x,{run:false,haz:false})){try{MR("Лифт не отвечает.");}catch(_){}}});
             grid.appendChild(button);
           });
-          panel.appendChild(grid);const foot=document.createElement("div");foot.textContent="ВЫБЕРИТЕ ЭТАЖ";foot.style.cssText="text-align:center;color:#9d988b;font:10px Arial;letter-spacing:1.2px";panel.appendChild(foot);
+          panel.appendChild(grid);
+          const foot=document.createElement("div");foot.className="wzm-lift__foot";foot.textContent="Выберите этаж";panel.appendChild(foot);
         }
       },
     });

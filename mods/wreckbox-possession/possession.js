@@ -134,6 +134,38 @@
     }
   };
   window.__WRECKBOX_POSSESSION__ = controller;
+
+  // Elevator panel styling. It reuses the game's own look (the .panel frame, hazard stripe, --accent,
+  // --room gradients, display font, square corners) through the game's CSS variables, so it follows
+  // the game's theme instead of hard-coded colours. The panel DOM is built in possession_hook.js.
+  const mountLiftStyle = () => {
+    if (document.getElementById('wzm-lift-style')) return;
+    const style = document.createElement('style');
+    style.id = 'wzm-lift-style';
+    style.textContent = `
+      .wzm-lift{position:fixed;z-index:5;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);width:188px;padding:12px 12px 11px;border-top-width:6px;font-family:var(--font-ui);color:var(--ink);pointer-events:auto;user-select:none}
+      .wzm-lift::before{content:'';position:absolute;left:-6px;right:-6px;top:-6px;height:6px;background:var(--hazard)}
+      .wzm-lift__head{display:flex;align-items:center;gap:10px;margin:0 0 10px;font:700 12px/1 var(--font-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+      .wzm-lift__head::after{content:'';order:1;flex:1;height:1px;background:var(--line)}
+      .wzm-lift__head b{order:2;font:700 22px/1 var(--font-display);font-variant-numeric:tabular-nums;letter-spacing:.01em;color:var(--ink)}
+      .wzm-lift__grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
+      .wzm-lift__btn{--lamp:#54575b;height:46px;border-radius:0;cursor:pointer;color:var(--ink);font:700 18px/1 var(--font-display);font-variant-numeric:tabular-nums;
+        background:linear-gradient(var(--lamp),var(--lamp)) 50% 0 / 16px 3px no-repeat,linear-gradient(rgba(0,0,0,.45),transparent 9px),linear-gradient(var(--room),var(--room2))}
+      .wzm-lift__btn:hover:not(:disabled){--lamp:#fff3c4;
+        background:linear-gradient(var(--lamp),var(--lamp)) 50% 0 / 16px 3px no-repeat,radial-gradient(ellipse 90% 110% at 50% 0,rgba(255,209,110,.36),rgba(255,190,80,.08) 70%,transparent),linear-gradient(var(--room),var(--room2))}
+      .wzm-lift__btn:active:not(:disabled){transform:translateY(1px)}
+      .wzm-lift__btn[aria-current='true']{--lamp:#fff6d0;cursor:default;color:var(--accent-ink);
+        background:linear-gradient(var(--lamp),var(--lamp)) 50% 0 / 16px 3px no-repeat,radial-gradient(ellipse 110% 150% at 50% 0,#ffe596,var(--accent) 58%,#dc9f00)}
+      .wzm-lift__foot{margin-top:10px;text-align:center;font:600 10.5px/1 var(--font-ui);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim)}
+      /* Touch: bottom corners belong to the pad and action buttons, so the panel sits under the HUD. */
+      body.touch .wzm-lift{top:calc(env(safe-area-inset-top,0px) + 76px);bottom:auto;right:10px;width:168px}
+      body.touch .wzm-lift__btn{height:44px}
+      @media (orientation:landscape) and (max-height:560px){body.touch .wzm-lift{top:calc(env(safe-area-inset-top,0px) + 64px);right:78px}}
+    `;
+    (document.head || document.documentElement).appendChild(style);
+  };
+  mountLiftStyle();
+
   // Separate possession button, using the game's native .tool toolbar styling.
   // The hook registers "possession" in the game's own tool lists, so the game normally draws a
   // native button. This extra button is only a fallback: it is mounted when the patch was applied
