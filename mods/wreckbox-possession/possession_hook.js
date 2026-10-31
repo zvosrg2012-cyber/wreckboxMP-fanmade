@@ -161,7 +161,7 @@
       if(k.jump&&t.onGround&&!t.sc){t.vy=-205;t.onGround=!1;t.fallY=t.y;t.state="idle";t.lstate="idle";n=0;k.jump=false;}
       if(dir&&!t.sc){t.state="walk";t.lstate="walk";t.t=999;}
       P.npc===t&&(pL.x+=(t.x-pL.x)*Math.min(1,12*e),pL.y+=(t.y-72-pL.y)*Math.min(1,12*e),pL.vx=0,pL.vy=0);
-    }else switch(t.state){case"idle":;
+    }else switch(t.state){case"idle":;`;
     replaceOnce('let n=0;switch(t.state){case"idle":', movement, 'native NPC movement');
 
     return originalEval(source);
