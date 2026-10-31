@@ -23,6 +23,7 @@
       'tool list'
     );
     replaceOnce('const OL=t=>', 'PL.possession=' + JSON.stringify(toolIcon) + ';const OL=t=>', 'custom icon');
+    replaceOnce('function Ny(t,e){const n=t.sc,o=t.nav;if("act"!==t.state)if("stair"===n.type', 'function Ny(t,e){const n=t.sc,o=t.nav;if("act"!==t.state&&!t.__wzmPossessed)if("stair"===n.type', 'possessed door and elevator transitions');
 
     const toolMarker = 'BS("camera",{name:r("Камера"),icon:"move",hint:r("Перетаскивайте вид. Колесо или щипок — зум."),mode:"both"});const WS=';
     const toolCode = `BS("possession",{
@@ -48,6 +49,7 @@
 
     const movement = `let n=0;if(t.__wzmPossessed){
       const P=window.__WRECKBOX_POSSESSION__,k=P.keys;
+      if(t.__wzmReleaseAfterSc&&!t.sc){t.__wzmReleaseAfterSc=false;t.__wzmPossessed=false;t.nav=null;t.act=null;t.state="idle";t.lstate="idle";t.t=.2;}
       const dir=(k.right?1:0)-(k.left?1:0),vert=k.up?-1:k.down?1:0;
       const mode=vert?(vert<0?"up":"down"):dir?(dir<0?"left":"right"):"";
       if(mode!==t.__wzmMoveDir){t.nav=null;t.act=null;t.__wzmMoveDir=mode;}
