@@ -8,7 +8,7 @@
     active: false,
     npc: null,
     camera: null,
-    keys: { left:false, right:false, up:false, down:false, run:false },
+    keys: { left:false, right:false, up:false, down:false, run:false, jump:false },
     verticalReleaseTimers: { up:null, down:null },
     setKey(key, pressed) {
       if (pressed) {
@@ -85,7 +85,7 @@
       const map = {
         ArrowLeft:'left', KeyA:'left', ArrowRight:'right', KeyD:'right',
         ArrowUp:'up', KeyW:'up', ArrowDown:'down', KeyS:'down',
-        ShiftLeft:'run', ShiftRight:'run'
+        ShiftLeft:'run', ShiftRight:'run', Space:'jump', Space:'jump'
       };
       if (e.code === 'Escape') {
         e.preventDefault(); e.stopImmediatePropagation(); this.release(); return;
