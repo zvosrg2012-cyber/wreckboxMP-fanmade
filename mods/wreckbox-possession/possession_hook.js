@@ -83,7 +83,7 @@
           panel.appendChild(grid);const foot=document.createElement("div");foot.textContent="НАЖМИТЕ ЭТАЖ";foot.style.cssText="text-align:center;color:#82939e;font:10px monospace;letter-spacing:1px";panel.appendChild(foot);
         }
       },
-      draw(ctx){const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q)return;const z=Math.max(.5,pL.zoom);ctx.save();ctx.textAlign="center";ctx.textBaseline="bottom";ctx.font="bold "+(12/z)+"px Arial";ctx.lineWidth=3/z;ctx.strokeStyle="#101820";ctx.fillStyle="#ffffff";ctx.strokeText("ВЫ",q.x,q.y-88/z);ctx.fillText("ВЫ",q.x,q.y-38/z);ctx.beginPath();ctx.moveTo(q.x-5/z,q.y-83/z);ctx.lineTo(q.x+5/z,q.y-34/z);ctx.lineTo(q.x,q.y-73/z);ctx.closePath();ctx.fillStyle="#8de7ff";ctx.fill();ctx.restore();}
+
     });
     window.addEventListener("wzm-possession-door",()=>{
       const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q)return;
@@ -150,10 +150,9 @@
         t.state="walk";t.lstate="walk";t.dir=dir||t.dir;
       }else if(dir){
         t.dir=dir;t.state="walk";t.lstate="walk";
-        t.nav=null;
-        n=k.run?t.runSpd:t.spd;
-        // The native collision/step-up code below handles each tread of an unlinked staircase.
-        if(!t.nav&&!t.sc){const floor=Fg(t.x+dir*7);if(floor>0&&floor<t.y&&t.y-floor<=7&&Eg(t.x+dir*7,floor)&&!sx(t.x+dir*7,floor-27)){t.y=floor;t.fallY=floor;t.onGround=!0;}}
+        const cur=Vg(t.x,t.y),tx=F(t.x+dir*120,8,m-8),target=Vg(tx,t.y)||Og(tx);
+        if(cur&&target&&cur!==target&&Wy(t,target,tx,{run:!!k.run,haz:!1}))n=Vy(t,e);
+        else n=k.run?t.runSpd:t.spd;
       }else{
         t.state="idle";t.lstate="idle";t.vx=0;n=0;
       }
