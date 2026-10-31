@@ -82,7 +82,7 @@
   const mountStatus = () => {
     if (document.getElementById('wzm-possession-status')) return;
     const style = document.createElement('style');
-    style.textContent = '#wzm-possession-status{position:fixed;z-index:2147483000;left:50%;bottom:12px;transform:translateX(-50%);padding:7px 13px;border-radius:8px;background:rgba(12,22,30,.88);border:1px solid #55c9ed;color:#bcefff;font:600 13px/1.25 Arial,sans-serif;pointer-events:none;text-shadow:0 1px 2px #000}';
+    style.textContent = '#wzm-possession-status{position:fixed;z-index:2147483000;right:12px;bottom:10px;padding:4px 8px;border-radius:5px;background:rgba(20,24,27,.58);border:1px solid rgba(150,165,175,.22);color:rgba(220,228,232,.68);font:11px/1.2 Arial,sans-serif;pointer-events:none}';
     document.head.appendChild(style);
     const status = document.createElement('div');
     status.id = 'wzm-possession-status';
