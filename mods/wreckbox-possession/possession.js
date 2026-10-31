@@ -8,7 +8,7 @@
     active: false,
     npc: null,
     camera: null,
-    keys: { left:false, right:false, up:false, down:false, run:false, jump:false },
+    keys: { left:false, right:false, up:false, down:false, run:false },
     enter(npc) {
       if (!npc || npc.gone || npc.dead || npc.rag || npc.zomb || npc.hidden || npc.sc) return false;
       if (this.active) this.release();
@@ -26,7 +26,7 @@
       npc.vx = 0;
       npc.vy = 0;
       npc.blocked = 0;
-      try { MR('Вселение: A/D — движение · W/S — лестницы и лифт · Shift — бег · Space — прыжок · Esc — выход · E — дверь (если доступно)'); } catch (_) {}
+      try { MR('Вселение: A/D или ←/→ — ходьба · W/S или ↑/↓ — лестницы и лифт · Shift — бег · E — дверь · Esc — выход'); } catch (_) {}
       return true;
     },
     release() {
@@ -57,7 +57,7 @@
       const map = {
         ArrowLeft:'left', KeyA:'left', ArrowRight:'right', KeyD:'right',
         ArrowUp:'up', KeyW:'up', ArrowDown:'down', KeyS:'down',
-        ShiftLeft:'run', ShiftRight:'run', Space:'jump'
+        ShiftLeft:'run', ShiftRight:'run'
       };
       if (e.code === 'Escape') {
         e.preventDefault(); e.stopImmediatePropagation(); this.release(); return;
@@ -68,8 +68,7 @@
       const key = map[e.code];
       if (!key) return;
       e.preventDefault(); e.stopImmediatePropagation();
-      if (key === 'jump') { if (!e.repeat) this.keys.jump = true; }
-      else this.keys[key] = true;
+      this.keys[key] = true;
     },
     keyup(e) {
       if (!this.active) return;
@@ -121,44 +120,33 @@
   window.addEventListener('blur', () => {
     Object.keys(controller.keys).forEach(k => controller.keys[k] = false);
   });
-  // Touch controls are shown only while possessing an NPC.
+  // Minimal touch pad, enabled only on touch-sized/coarse-pointer devices.
   const mountTouchControls = () => {
-    if (document.getElementById('wzm-touch-controls')) return;
-    const root = document.createElement('div');
-    root.id = 'wzm-touch-controls';
-    root.innerHTML = `
-      <div class="wzm-pad">
-        <button data-key="up" aria-label="Вверх">▲</button>
-        <div><button data-key="left" aria-label="Влево">◀</button><button data-key="down" aria-label="Вниз">▼</button><button data-key="right" aria-label="Вправо">▶</button></div>
-      </div>
-      <div class="wzm-actions">
-        <button data-key="run">БЕГ</button><button data-key="jump">ПРЫЖОК</button>
-        <button data-action="interact">E · ДВЕРЬ</button><button data-action="exit">ВЫХОД</button>
-      </div>`;
-    const style = document.createElement('style');
-    style.textContent = `
-      #wzm-touch-controls{display:none;position:fixed;z-index:100000;left:0;right:0;bottom:max(14px,env(safe-area-inset-bottom));padding:10px 14px;box-sizing:border-box;justify-content:space-between;align-items:flex-end;gap:12px;pointer-events:none;touch-action:none;user-select:none}
-      #wzm-touch-controls .wzm-pad,#wzm-touch-controls .wzm-actions{display:flex;flex-direction:column;gap:7px;pointer-events:auto}
-      #wzm-touch-controls .wzm-pad>div{display:flex;gap:7px}
-      #wzm-touch-controls .wzm-actions{display:grid;grid-template-columns:repeat(2,minmax(62px,1fr));max-width:210px}
-      #wzm-touch-controls button{min-width:48px;min-height:48px;padding:8px;border:1px solid rgba(255,255,255,.4);border-radius:12px;background:rgba(20,24,28,.78);color:#fff;font:700 13px Arial,sans-serif;touch-action:none;-webkit-user-select:none;user-select:none}
-      #wzm-touch-controls button:active{background:rgba(170,125,60,.95)}
-      @media(pointer:coarse),(max-width:800px){#wzm-touch-controls{display:flex}}
+    if(document.getElementById('wzm-touch-controls'))return;
+    const root=document.createElement('div');root.id='wzm-touch-controls';
+    root.innerHTML='<div class="wzm-pad"><button data-key="up">▲</button><div><button data-key="left">◀</button><button data-key="down">▼</button><button data-key="right">▶</button></div></div><button class="wzm-interact" data-action="interact">E</button>';
+    const style=document.createElement('style');
+    style.textContent=`
+      #wzm-touch-controls{display:none;position:fixed;z-index:100000;left:0;right:0;bottom:max(12px,env(safe-area-inset-bottom));padding:8px 12px;box-sizing:border-box;justify-content:space-between;align-items:flex-end;pointer-events:none;touch-action:none;user-select:none}
+      #wzm-touch-controls .wzm-pad{display:flex;flex-direction:column;gap:6px;pointer-events:auto}
+      #wzm-touch-controls .wzm-pad>div{display:flex;gap:6px}
+      #wzm-touch-controls button{width:54px;height:54px;padding:0;border:1px solid rgba(255,255,255,.45);border-radius:9px;background:rgba(18,22,26,.68);color:#fff;font:700 21px Arial,sans-serif;touch-action:none;user-select:none}
+      #wzm-touch-controls .wzm-interact{pointer-events:auto;width:48px;height:48px;font-size:17px}
     `;
-    document.head.appendChild(style); document.body.appendChild(root);
-    const clear = key => { if (controller.keys[key] !== undefined) controller.keys[key] = false; };
-    root.querySelectorAll('[data-key]').forEach(btn => {
+    document.head.appendChild(style);document.body.appendChild(root);
+    const touchDevice=()=>window.matchMedia('(pointer:coarse), (max-width:800px)').matches;
+    root.querySelectorAll('[data-key]').forEach(btn=>{
       const key=btn.dataset.key;
-      const down=e=>{e.preventDefault();if(!controller.active)return;if(key==='jump')controller.keys.jump=true;else controller.keys[key]=true;try{btn.setPointerCapture(e.pointerId);}catch(_){}};
-      const up=e=>{e.preventDefault();clear(key);};
-      btn.addEventListener('pointerdown',down);['pointerup','pointercancel','lostpointercapture','pointerleave'].forEach(ev=>btn.addEventListener(ev,up));
+      const down=e=>{e.preventDefault();if(!controller.active)return;controller.keys[key]=true;try{btn.setPointerCapture(e.pointerId);}catch(_){}};
+      const up=e=>{e.preventDefault();controller.keys[key]=false;};
+      btn.addEventListener('pointerdown',down);
+      ['pointerup','pointercancel','lostpointercapture','pointerleave'].forEach(ev=>btn.addEventListener(ev,up));
     });
-    root.querySelector('[data-action="interact"]').addEventListener('click',()=>controller.interact());
-    root.querySelector('[data-action="exit"]').addEventListener('click',()=>controller.release());
-    const refresh=()=>{root.style.display=controller.active?'flex':'none';};
-    const timer=setInterval(()=>{refresh();if(!document.body.contains(root))clearInterval(timer);},180);
-    window.addEventListener('wzm-possession-release',refresh);
-    refresh();
+    root.querySelector('[data-action="interact"]').addEventListener('pointerdown',e=>{e.preventDefault();controller.interact();});
+    const refresh=()=>{root.style.display=controller.active&&touchDevice()?'flex':'none';};
+    window.addEventListener('resize',refresh);window.addEventListener('wzm-possession-release',refresh);
+    setInterval(refresh,300);refresh();
   };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mountTouchControls,{once:true});else mountTouchControls();
+
 })();
