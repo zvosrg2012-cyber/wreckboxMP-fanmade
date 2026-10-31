@@ -8,6 +8,7 @@ if (-not (Test-Path -LiteralPath $indexPath -PathType Leaf)) {
   throw "Could not find index.html at '$gameRoot'. Put this folder at <game>\mods\wreckbox-possession\."
 }
 $html = [System.IO.File]::ReadAllText($indexPath, [System.Text.Encoding]::UTF8)
+$legacyZombieBlock = $html.Contains('<!-- WRECKBOX ZOMBIE MOD: BEGIN -->')
 
 # Remove any previous zombie/possession loader block before installing the new one.
 $oldBlockPattern = '(?s)<!-- WRECKBOX (?:ZOMBIE|POSSESSION) MOD: BEGIN -->.*?<!-- WRECKBOX (?:ZOMBIE|POSSESSION) MOD: END -->\s*'
@@ -15,6 +16,7 @@ $html = [regex]::Replace($html, $oldBlockPattern, '')
 
 $originalEvalCall = '(0,eval)(new TextDecoder().decode(u))'
 $hookedEvalCall = 'window.__WRECKBOX_RUN_GAME_SOURCE__ ? window.__WRECKBOX_RUN_GAME_SOURCE__(new TextDecoder().decode(u)) : (0,eval)(new TextDecoder().decode(u))'
+if ($legacyZombieBlock) { $html = $html.Replace($hookedEvalCall, $originalEvalCall) }
 if ($html.Contains($originalEvalCall)) {
   $html = $html.Replace($originalEvalCall, $hookedEvalCall)
 } elseif (-not $html.Contains('__WRECKBOX_RUN_GAME_SOURCE__(new TextDecoder().decode(u))')) {
