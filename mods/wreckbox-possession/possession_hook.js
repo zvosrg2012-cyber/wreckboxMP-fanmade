@@ -103,12 +103,15 @@
     const movement = `let n=0;if(t.__wzmPossessed){
       const P=window.__WRECKBOX_POSSESSION__,k=P.keys;
       if(t.__wzmReleaseAfterSc&&!t.sc){t.__wzmReleaseAfterSc=false;t.__wzmPossessed=false;t.nav=null;t.act=null;t.state="idle";t.lstate="idle";t.t=.2;}
-      const dir=(k.right?1:0)-(k.left?1:0),vert=k.up?-1:k.down?1:0;
+      const rawDir=(k.right?1:0)-(k.left?1:0),vert=k.up?-1:k.down?1:0;
+      // Once W/S starts a stair route, the NPC follows it automatically.
+      // A/D is ignored until the stair route finishes; it cannot cancel or steer it.
+      const stairRoute=!!(t.nav&&t.nav.steps&&t.nav.steps.some(step=>step.type==="stair"));
+      const dir=stairRoute?0:rawDir;
       const mode=vert?(vert<0?"up":"down"):dir?(dir<0?"left":"right"):"";
       if(mode!==t.__wzmMoveDir){
-        // Horizontal input always takes priority over an unfinished stair route.
-        if(dir){t.nav=null;t.act=null;}
-        else if(!vert){t.nav=null;t.act=null;}
+        if(rawDir&&!stairRoute){t.nav=null;t.act=null;}
+        else if(!vert&&!stairRoute){t.nav=null;t.act=null;}
         t.__wzmMoveDir=mode;
       }
       t.pose="";t.t=999;t.blocked=0;
