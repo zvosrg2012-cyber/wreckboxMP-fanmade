@@ -7,6 +7,22 @@
   const originalEval = window.eval;
   const toolIcon = '<path d="M12 3.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M4.5 20c.6-3.5 3.2-5.3 7.5-5.3s6.9 1.8 7.5 5.3"/><path d="M3 7.5h3M18 7.5h3M12 1v2M12 12v2"/><path d="M2.5 12h3M18.5 12h3"/>';
 
+  // The game's own message function (MR) does not exist yet while the source is being patched, so a
+  // notice about a failed patch has to wait until the game is up. If MR is not reachable from here,
+  // fall back to the game's plain-HTML #toast element.
+  const notifyLater = (message) => {
+    const show = () => {
+      try { if (typeof MR === 'function') { MR(message); return; } } catch (_) {}
+      const toast = document.getElementById('toast');
+      if (!toast) return;
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 7000);
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(show, 1500), { once: true });
+    else setTimeout(show, 1500);
+  };
+
   window.__WRECKBOX_RUN_GAME_SOURCE__ = function (source) {
     if (typeof source !== 'string') return originalEval(source);
     const originalSource = source;
@@ -31,7 +47,7 @@
     const toolMarker = 'BS("camera",{name:r("Камера"),icon:"move",hint:r("Перетаскивайте вид. Колесо или щипок — зум."),mode:"both"});const WS=';
     const toolCode = `BS("possession",{
       name:r("Вселение"),icon:"possession",
-      hint:r("Кликните по человеку. WASD — движение, W/S — лестницы и лифт, Shift — бег, Space — прыжок, E — выход."),
+      hint:r("Кликните по человеку. WASD — движение, W/S — лестницы и лифт, Shift — бег, Space — прыжок, E — дверь, Esc — выход."),
       down(t){
         const P=window.__WRECKBOX_POSSESSION__;
         if(!P)return;
@@ -43,7 +59,7 @@
           if(Math.abs(dx)<28&&Math.abs(dy)<34&&d<dist){best=q;dist=d;}
         }
         if(!best){MR(r("Нажмите прямо на живого человека"),!0);return;}
-        P.camera={x:pL.x,y:pL.y};if(P.enter(best))MR(r("Вы вселились в NPC. Нажмите E для выхода."),!0);
+        P.camera={x:pL.x,y:pL.y};if(P.enter(best))MR(r("Вы вселились в NPC. Esc — выход, E — дверь."),!0);
       },
       update(){
         const P=window.__WRECKBOX_POSSESSION__,panelId="wzm-possession-lift";
@@ -169,10 +185,13 @@
     }else switch(t.state){case"idle":;`;
     replaceOnce('let n=0;switch(t.state){case"idle":', movement, 'native NPC movement');
 
+    // possession.js shows its fallback toolbar button only when this flag is set.
+    window.__WRECKBOX_POSSESSION_READY__ = true;
     return originalEval(source);
     } catch (error) {
+      window.__WRECKBOX_POSSESSION_READY__ = false;
       console.error('Wreckbox Possession patch failed; starting unmodified game source.', error);
-      try { MR('Мод «Вселение»: версия игры не совпала с патчем. Запущена обычная игра.'); } catch (_) {}
+      notifyLater('Мод «Вселение»: версия игры не совпала с патчем. Запущена обычная игра.');
       return originalEval(originalSource);
     }
   };
