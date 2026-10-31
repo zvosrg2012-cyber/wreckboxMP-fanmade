@@ -58,6 +58,11 @@
       if (e.code === 'Escape') {
         e.preventDefault(); e.stopImmediatePropagation(); this.release(); return;
       }
+      if (e.code === 'KeyE') {
+        e.preventDefault(); e.stopImmediatePropagation();
+        window.dispatchEvent(new Event('wzm-possession-door'));
+        return;
+      }
       const key = map[e.code];
       if (!key) return;
       e.preventDefault(); e.stopImmediatePropagation();
