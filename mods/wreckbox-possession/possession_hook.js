@@ -45,9 +45,36 @@
         if(!best){MR(r("Нажмите прямо на живого человека"),!0);return;}
         P.camera={x:pL.x,y:pL.y};if(P.enter(best))MR(r("Вы вселились в NPC. Нажмите E для выхода."),!0);
       },
-      update(){const P=window.__WRECKBOX_POSSESSION__;if(P&&P.active&&(!P.npc||P.npc.gone||P.npc.dead||P.npc.rag))P.release();},
+      update(){
+        const P=window.__WRECKBOX_POSSESSION__;
+        if(!P||!P.active||!P.npc||P.npc.gone||P.npc.dead||P.npc.rag){if(P&&P.active&&P.npc&&(!P.npc||P.npc.gone||P.npc.dead||P.npc.rag))P.release();const old=document.getElementById("wzm-possession-lift");if(old)old.remove();return;}
+        const q=P.npc;
+        let lift=null,dist=1e9;
+        for(const e of kg.elevs){if(e.dead)continue;const d=Math.abs(e.sx-q.x);if(d<90&&d<dist){lift=e;dist=d;}}
+        let panel=document.getElementById("wzm-possession-lift");
+        if(!lift){if(panel)panel.remove();return;}
+        if(!panel){panel=document.createElement("div");panel.id="wzm-possession-lift";panel.style.cssText="position:fixed;z-index:99999;left:50%;bottom:86px;transform:translateX(-50%);display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:80vw;padding:8px;background:rgba(12,20,28,.92);border:1px solid #8de7ff;border-radius:8px;font:12px Arial;color:white";document.body.appendChild(panel);}
+        if(panel.dataset.elevator!==String(lift.id)){
+          panel.dataset.elevator=String(lift.id);panel.replaceChildren();
+          lift.stops.forEach((stop,i)=>{const b=document.createElement("button");b.type="button";b.textContent="Этаж "+(i+1);b.title="Вызвать лифт на этаж "+(i+1);b.style.cssText="padding:6px 9px;background:#263b49;color:white;border:1px solid #8de7ff;border-radius:5px;cursor:pointer";b.addEventListener("click",()=>{const P=window.__WRECKBOX_POSSESSION__;if(!P||!P.active||!P.npc)return;const link=lift.hub.links.find(x=>x.stop===i&&x.a);if(!link){try{MR("Не удалось найти площадку этого этажа.");}catch(_){}return;}P.npc.nav=null;P.npc.act=null;Wy(P.npc,link.a,link.ax,{run:false});});panel.appendChild(b);});
+        }
+      },
       draw(ctx){const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q)return;const z=Math.max(.5,pL.zoom);ctx.save();ctx.textAlign="center";ctx.textBaseline="bottom";ctx.font=`bold ${12/z}px Arial`;ctx.lineWidth=3/z;ctx.strokeStyle="#101820";ctx.fillStyle="#ffffff";ctx.strokeText("ВЫ",q.x,q.y-38/z);ctx.fillText("ВЫ",q.x,q.y-38/z);ctx.beginPath();ctx.moveTo(q.x-5/z,q.y-34/z);ctx.lineTo(q.x+5/z,q.y-34/z);ctx.lineTo(q.x,q.y-25/z);ctx.closePath();ctx.fillStyle="#8de7ff";ctx.fill();ctx.restore();}
-    });window.addEventListener("wzm-possession-release",()=>{const P=window.__WRECKBOX_POSSESSION__;if(P&&P.camera){pL.x=P.camera.x;pL.y=P.camera.y;P.camera=null;}});const WS=`;
+    });
+    window.addEventListener("wzm-possession-door",()=>{
+      const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q)return;
+      let best=null,bestD=42;
+      for(const edge of kg.links){if(edge.dead||edge.type!=="door"||!edge.a||!edge.b)continue;
+        const da=Math.hypot(q.x-edge.ax,q.y-edge.a.y),db=Math.hypot(q.x-edge.bx,q.y-edge.b.y);
+        const d=Math.min(da,db);if(d<bestD){bestD=d;best={edge,fromA:da<=db};}
+      }
+      if(!best){try{MR("Подойдите ближе к двери и нажмите E.");}catch(_){}return;}
+      const edge=best.edge,target=best.fromA?edge.b:edge.a,x=best.fromA?edge.bx:edge.ax;
+      q.nav=null;q.act=null;
+      if(!Wy(q,target,x,{run:false})){try{MR("Не удалось пройти через эту дверь.");}catch(_){}}
+    });
+    window.addEventListener("wzm-possession-release",()=>{const P=window.__WRECKBOX_POSSESSION__;const panel=document.getElementById("wzm-possession-lift");if(panel)panel.remove();if(P&&P.camera){pL.x=P.camera.x;pL.y=P.camera.y;P.camera=null;}});
+    const WS=`;
     replaceOnce(toolMarker, toolMarker.replace('const WS=', toolCode), 'tool registration');
 
     const movement = `let n=0;if(t.__wzmPossessed){
