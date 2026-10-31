@@ -24,7 +24,7 @@
     );
     replaceOnce('LA=["camera","brush","building","furniture","explosives","people","eraser"]', 'LA=["camera","possession","brush","building","furniture","explosives","people","eraser"]', 'build tool list');
     replaceOnce('const OL=t=>', 'PL.possession=' + JSON.stringify(toolIcon) + ';const OL=t=>', 'custom icon');
-    replaceOnce('function Ny(t,e){const n=t.sc,o=t.nav;if("act"!==t.state)if("stair"===n.type', 'function Ny(t,e){const n=t.sc,o=t.nav;if("act"!==t.state&&!t.__wzmPossessed)if("stair"===n.type', 'possessed door and elevator transitions');
+    // Keep native stair, door and elevator transitions active while possessed.
 
     replaceOnce('function RA(t){if(!OS[t])return;', 'window.__WRECKBOX_SELECT_POSSESSION__=()=>RA("possession");function RA(t){if(!OS[t])return;', 'native tool selector');
 
@@ -110,28 +110,22 @@
         if(!vert&&!dir){t.nav=null;t.act=null;}
         t.__wzmMoveDir=mode;
       }
-      t.pose="";t.act=null;t.t=999;t.blocked=0;
+      t.pose="";t.t=999;t.blocked=0;
       if(t.nav){n=Vy(t,e);}
       else if(vert){
         const cur=Vg(t.x,t.y);let dest=null,targetX=t.x,best=1e9;
-        if(cur){
-          // Search nearby stair links as well as cur.links: Vg may return a neighbouring
-          // floor node while the NPC is standing on the first tread.
-          const stairLinks=(kg.links||[]).filter(edge=>edge&&!edge.dead&&edge.type==="stair");
-          const candidates=[...(cur.links||[]),...stairLinks];
-          for(const edge of candidates){
-            if(edge.type==="stair"){
-              const other=edge.a===cur?edge.b:edge.a;
-              if(!other||(vert<0?other.y>=cur.y-4:other.y<=cur.y+4))continue;
-              const x=edge.a===cur?edge.bx:edge.ax,cost=Math.abs(other.y-cur.y)+Math.abs(x-t.x)*.45;
-              if(cost<best){best=cost;dest=other;targetX=x;}
-            }else if(edge.type==="elev"&&edge.elev){
-              for(const stop of kg.links){if(stop.type!=="elev"||stop.elev!==edge.elev||!stop.a||stop.a===cur)continue;
-                const other=stop.a;if(vert<0?other.y>=cur.y-4:other.y<=cur.y+4)continue;
-                const x=stop.ax,cost=Math.abs(other.y-cur.y)+Math.abs(x-t.x)*.45+12;
-                if(cost<best){best=cost;dest=other;targetX=x;}
-              }
-            }
+        // Find the nearest stair endpoint in the requested vertical direction.
+        // NPCs can approach the stair automatically instead of requiring exact positioning.
+        for(const edge of kg.links){
+          if(!edge||edge.dead||edge.type!=="stair"||!edge.a||!edge.b)continue;
+          const ends=[{node:edge.a,x:edge.ax,other:edge.b,otherX:edge.bx},{node:edge.b,x:edge.bx,other:edge.a,otherX:edge.ax}];
+          for(const ep of ends){
+            const dy=ep.other.y-ep.node.y;
+            if((vert<0&&dy>=-3)||(vert>0&&dy<=3))continue;
+            const dx=Math.abs(t.x-ep.x),dyHere=Math.abs(t.y-ep.node.y);
+            if(dx>115||dyHere>105)continue;
+            const cost=dx+dyHere*1.2+Math.abs(ep.otherX-ep.x)*.08;
+            if(cost<best){best=cost;dest=ep.other;targetX=ep.otherX;}
           }
         }
         if(dest&&Wy(t,dest,targetX,{run:!!k.run,haz:!1})){n=Vy(t,e);}
@@ -160,12 +154,9 @@
         t.dir=dir;t.state="walk";t.lstate="walk";
         t.nav=null;
         n=k.run?t.runSpd:t.spd;
-        // The native collision/step-up code below handles each tread of an unlinked staircase.
-        if(!t.nav&&!t.sc){const floor=Fg(t.x+dir*7);if(floor>0&&floor<t.y&&t.y-floor<=7&&Eg(t.x+dir*7,floor)&&!sx(t.x+dir*7,floor-27)){t.y=floor;t.fallY=t.y;t.onGround=!0;}}
       }else{
         t.state="idle";t.lstate="idle";t.vx=0;n=0;
       }
-      if(k.jump&&t.onGround&&!t.sc){t.vy=-205;t.onGround=!1;t.fallY=t.y;t.state="idle";t.lstate="idle";n=0;k.jump=false;}
       if(dir&&!t.sc){t.state="walk";t.lstate="walk";t.t=999;}
       P.npc===t&&(pL.x+=(t.x-pL.x)*Math.min(1,12*e),pL.y+=(t.y-72-pL.y)*Math.min(1,12*e),pL.vx=0,pL.vy=0);
     }else switch(t.state){case"idle":`;
