@@ -26,7 +26,7 @@
       npc.vx = 0;
       npc.vy = 0;
       npc.blocked = 0;
-      try { MR('Вселение: A/D — ходьба · W/S — лестницы и лифт · Shift — бег · Space — прыжок · E — выход'); } catch (_) {}
+      try { MR('Вселение: A/D — движение · W/S — лестницы и лифт · Shift — бег · Space — прыжок · Esc — выход · E — дверь (если доступно)'); } catch (_) {}
       return true;
     },
     release() {
@@ -55,7 +55,7 @@
         ArrowUp:'up', KeyW:'up', ArrowDown:'down', KeyS:'down',
         ShiftLeft:'run', ShiftRight:'run', Space:'jump'
       };
-      if (e.code === 'KeyE' || e.code === 'Escape') {
+      if (e.code === 'Escape') {
         e.preventDefault(); e.stopImmediatePropagation(); this.release(); return;
       }
       const key = map[e.code];
