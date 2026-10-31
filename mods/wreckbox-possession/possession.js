@@ -78,6 +78,35 @@
     }
   };
   window.__WRECKBOX_POSSESSION__ = controller;
+  // Always-visible status and direct tool-selection button.
+  const mountUI = () => {
+    if (document.getElementById('wzm-possession-status')) return;
+    const style = document.createElement('style');
+    style.textContent = '#wzm-possession-status{position:fixed;z-index:2147483000;left:50%;bottom:12px;transform:translateX(-50%);padding:7px 13px;border-radius:8px;background:rgba(12,22,30,.88);border:1px solid #55c9ed;color:#bcefff;font:600 13px/1.25 Arial,sans-serif;pointer-events:none;text-shadow:0 1px 2px #000}#wzm-possession-button{position:fixed;z-index:2147483001;right:14px;bottom:12px;padding:10px 16px;border:1px solid #55c9ed;border-radius:9px;background:#173b4b;color:#e6faff;font:700 14px Arial,sans-serif;cursor:pointer;box-shadow:0 2px 12px #0008}#wzm-possession-button:hover{background:#20576b}';
+    document.head.appendChild(style);
+    const status = document.createElement('div');
+    status.id = 'wzm-possession-status';
+    status.textContent = 'Мод на вселение активен';
+    document.body.appendChild(status);
+    const button = document.createElement('button');
+    button.id = 'wzm-possession-button';
+    button.type = 'button';
+    button.textContent = 'Вселение';
+    button.addEventListener('click', () => {
+      if (controller.active) controller.release();
+      else if (typeof window.__WRECKBOX_SELECT_POSSESSION__ === 'function') {
+        window.__WRECKBOX_SELECT_POSSESSION__();
+        status.textContent = 'Вселение: выберите NPC';
+      } else {
+        status.textContent = 'Мод на вселение активен · перезагрузите игру';
+      }
+    });
+    document.body.appendChild(button);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountUI, {once:true});
+  else mountUI();
+  window.addEventListener('load', mountUI, {once:true});
+
   window.addEventListener('keydown', e => controller.keydown(e), true);
   window.addEventListener('keyup', e => controller.keyup(e), true);
   window.addEventListener('blur', () => {
