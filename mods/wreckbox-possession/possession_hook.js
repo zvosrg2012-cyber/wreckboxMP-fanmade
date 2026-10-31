@@ -104,30 +104,27 @@
       const P=window.__WRECKBOX_POSSESSION__,k=P.keys;
       if(t.__wzmReleaseAfterSc&&!t.sc){t.__wzmReleaseAfterSc=false;t.__wzmPossessed=false;t.nav=null;t.act=null;t.state="idle";t.lstate="idle";t.t=.2;}
       const dir=(k.right?1:0)-(k.left?1:0),vert=k.up?-1:k.down?1:0;
-      // Preserve the game's original stair/pathfinding mechanics; only track input changes.
       const mode=vert?(vert<0?"up":"down"):dir?(dir<0?"left":"right"):"";
-      if(mode!==t.__wzmMoveDir){t.__wzmMoveDir=mode;}
+      if(mode!==t.__wzmMoveDir){t.nav=null;t.act=null;t.__wzmMoveDir=mode;}
       t.pose="";t.act=null;t.t=999;t.blocked=0;
       if(t.nav){n=Vy(t,e);}
       else if(vert){
-        const cur=Vg(t.x,t.y);let dest=null,targetX=t.x,bestElev=1e9,bestStair=1e9,stairDest=null,stairX=t.x;
+        const cur=Vg(t.x,t.y);let dest=null,targetX=t.x,best=1e9;
         if(cur){
-          // If a usable lift connects this floor to the requested direction, prefer it over stairs.
           for(const edge of cur.links){
-            if(edge.type==="elev"&&edge.elev){
-              for(const stop of kg.links){if(stop.type!=="elev"||stop.elev!==edge.elev||!stop.a||stop.a===cur)continue;
-                const other=stop.a;if(vert<0?other.y>=cur.y-4:other.y<=cur.y+4)continue;
-                const x=stop.ax,cost=Math.abs(other.y-cur.y)+Math.abs(x-t.x)*.45;
-                if(cost<bestElev){bestElev=cost;dest=other;targetX=x;}
-              }
-            }else if(edge.type==="stair"){
+            if(edge.type==="stair"){
               const other=edge.a===cur?edge.b:edge.a;
               if(!other||(vert<0?other.y>=cur.y-4:other.y<=cur.y+4))continue;
               const x=edge.a===cur?edge.bx:edge.ax,cost=Math.abs(other.y-cur.y)+Math.abs(x-t.x)*.45;
-              if(cost<bestStair){bestStair=cost;stairDest=other;stairX=x;}
+              if(cost<best){best=cost;dest=other;targetX=x;}
+            }else if(edge.type==="elev"&&edge.elev){
+              for(const stop of kg.links){if(stop.type!=="elev"||stop.elev!==edge.elev||!stop.a||stop.a===cur)continue;
+                const other=stop.a;if(vert<0?other.y>=cur.y-4:other.y<=cur.y+4)continue;
+                const x=stop.ax,cost=Math.abs(other.y-cur.y)+Math.abs(x-t.x)*.45+12;
+                if(cost<best){best=cost;dest=other;targetX=x;}
+              }
             }
           }
-          if(!dest&&stairDest){dest=stairDest;targetX=stairX;}
         }
         if(dest&&Wy(t,dest,targetX,{run:!!k.run,haz:!1})){n=Vy(t,e);}
         else if(cur){
@@ -153,9 +150,10 @@
         t.state="walk";t.lstate="walk";t.dir=dir||t.dir;
       }else if(dir){
         t.dir=dir;t.state="walk";t.lstate="walk";
-        const cur=Vg(t.x,t.y),tx=F(t.x+dir*120,8,m-8),target=Vg(tx,t.y)||Og(tx);
-        if(cur&&target&&cur!==target&&Wy(t,target,tx,{run:!!k.run,haz:!1}))n=Vy(t,e);
-        else n=k.run?t.runSpd:t.spd;
+        t.nav=null;
+        n=k.run?t.runSpd:t.spd;
+        // The native collision/step-up code below handles each tread of an unlinked staircase.
+        if(!t.nav&&!t.sc){const floor=Fg(t.x+dir*7);if(floor>0&&floor<t.y&&t.y-floor<=7&&Eg(t.x+dir*7,floor)&&!sx(t.x+dir*7,floor-27)){t.y=floor;t.fallY=t.y;t.onGround=!0;}}
       }else{
         t.state="idle";t.lstate="idle";t.vx=0;n=0;
       }
