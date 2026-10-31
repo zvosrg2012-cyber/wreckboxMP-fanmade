@@ -115,8 +115,7 @@
       if(t.nav){n=Vy(t,e);}
       else if(vert){
         const cur=Vg(t.x,t.y);let dest=null,targetX=t.x,best=1e9;
-        // Restore the original stair routing: choose a stair connected to the
-        // NPC's current segment, then use the ramp fallback below if needed.
+        // First prefer stairs connected to the NPC's current floor segment.
         if(cur){
           for(const edge of cur.links){
             if(edge.type==="stair"){
@@ -133,6 +132,22 @@
                 const x=stop.ax,cost=Math.abs(other.y-cur.y)+Math.abs(x-t.x)*.45+12;
                 if(cost<best){best=cost;dest=other;targetX=x;}
               }
+            }
+          }
+        }
+        // If the current segment has no usable stair link (common near landings),
+        // find a stair endpoint on this same floor before choosing a remote floor.
+        if(!dest){
+          for(const edge of kg.links){
+            if(!edge||edge.dead||edge.type!=="stair"||!edge.a||!edge.b)continue;
+            const ends=[{node:edge.a,x:edge.ax,other:edge.b,otherX:edge.bx},{node:edge.b,x:edge.bx,other:edge.a,otherX:edge.ax}];
+            for(const ep of ends){
+              const dy=ep.other.y-ep.node.y;
+              if(vert<0?dy>=-3:dy<=3)continue;
+              const floorOffset=Math.abs(ep.node.y-t.y),dx=Math.abs(ep.x-t.x);
+              if(floorOffset>42||dx>220)continue;
+              const cost=floorOffset*3+dx+Math.abs(ep.otherX-ep.x)*.08;
+              if(cost<best){best=cost;dest=ep.other;targetX=ep.otherX;}
             }
           }
         }
