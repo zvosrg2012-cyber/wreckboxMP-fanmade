@@ -26,7 +26,7 @@
     replaceOnce('function Ny(t,e){const n=t.sc,o=t.nav;if("act"!==t.state)if("stair"===n.type', 'function Ny(t,e){const n=t.sc,o=t.nav;if("act"!==t.state&&!t.__wzmPossessed)if("stair"===n.type', 'possessed door and elevator transitions');
 
     const toolMarker = 'BS("camera",{name:r("Камера"),icon:"move",hint:r("Перетаскивайте вид. Колесо или щипок — зум."),mode:"both"});const WS=';
-    const toolCode = `BS("possession",{
+    const toolCode = `window.__WRECKBOX_SELECT_POSSESSION__=()=>RA("possession");BS("possession",{
       name:r("Вселение"),icon:"possession",
       hint:r("Кликните по человеку. WASD — движение, W/S — лестницы и лифт, Shift — бег, Space — прыжок, E — выход."),
       down(t){
