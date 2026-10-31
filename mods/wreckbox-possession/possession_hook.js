@@ -51,7 +51,13 @@
           if(P&&P.active&&P.npc&&(!P.npc||P.npc.gone||P.npc.dead||P.npc.rag))P.release();
           const old=document.getElementById(panelId);if(old)old.remove();return;
         }
-        const q=P.npc;let lift=null,nearStop=-1,best=1e9;
+        const q=P.npc;
+        // Keep the camera locked to the possessed NPC even while native stair/elevator
+        // transitions temporarily take over movement and skip the custom movement branch.
+        pL.x += (q.x - pL.x) * 0.22;
+        pL.y += (q.y - 72 - pL.y) * 0.22;
+        pL.vx = 0; pL.vy = 0;
+        let lift=null,nearStop=-1,best=1e9;
         for(const e of kg.elevs){
           if(e.dead||!e.stops||!e.hub)continue;
           for(let i=0;i<e.stops.length;i++){
@@ -66,21 +72,21 @@
         let panel=document.getElementById(panelId);
         if(!lift){if(panel)panel.remove();return;}
         if(!panel){panel=document.createElement("div");panel.id=panelId;
-          panel.style.cssText="position:fixed;z-index:99999;right:24px;bottom:96px;display:flex;flex-direction:column;gap:12px;width:176px;padding:14px;background:linear-gradient(155deg,rgba(35,45,57,.97),rgba(13,19,27,.98));border:1px solid rgba(164,190,211,.28);border-radius:16px;box-shadow:0 14px 40px rgba(0,0,0,.42),inset 0 1px rgba(255,255,255,.08);font:12px system-ui,Arial,sans-serif;color:#edf5fb;backdrop-filter:blur(12px)";
+          panel.style.cssText="position:fixed;z-index:99999;right:24px;bottom:96px;display:flex;flex-direction:column;gap:12px;width:176px;padding:14px;background:rgba(30,31,30,.94);border:1px solid rgba(205,198,178,.28);border-radius:5px;box-shadow:0 5px 18px rgba(0,0,0,.38),inset 0 1px rgba(255,255,255,.05);font:12px Arial,sans-serif;color:#e5e0d4";
           document.body.appendChild(panel);
         }
         if(panel.dataset.elevator!==String(lift.id)||panel.dataset.floor!==String(nearStop)){
           panel.dataset.elevator=String(lift.id);panel.dataset.floor=String(nearStop);panel.replaceChildren();
           const head=document.createElement("div");head.textContent="ЛИФТ";
-          head.style.cssText="text-align:center;padding:2px 2px 10px;color:#a9c1d5;border-bottom:1px solid rgba(180,205,225,.2);font:600 11px system-ui;letter-spacing:2px;text-transform:uppercase";panel.appendChild(head);
+          head.style.cssText="text-align:center;padding:2px 2px 10px;color:#c4bda9;border-bottom:1px solid rgba(205,198,178,.18);font:600 11px Arial;letter-spacing:1.5px;text-transform:uppercase";panel.appendChild(head);
           const grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(3,1fr);gap:7px";
           lift.stops.forEach((stop,i)=>{
             const button=document.createElement("button");button.type="button";button.textContent=String(i+1);button.title="Перейти на этаж "+(i+1);
-            button.style.cssText="height:38px;background:"+(i===nearStop?"linear-gradient(145deg,#3c91b5,#24617f)":"rgba(255,255,255,.07)")+";color:#f4f8fb;border:1px solid "+(i===nearStop?"#72c8e9":"rgba(190,210,225,.18)")+";border-radius:9px;box-shadow:"+(i===nearStop?"0 3px 10px rgba(40,140,190,.25)":"inset 0 1px rgba(255,255,255,.06)")+";font:600 14px system-ui;cursor:pointer";
+            button.style.cssText="height:38px;background:"+(i===nearStop?"#77705f":"rgba(255,255,255,.045)")+";color:"+(i===nearStop?"#fff9e9":"#d8d3c7")+";border:1px solid "+(i===nearStop?"#a69b80":"rgba(205,198,178,.17)")+";border-radius:4px;box-shadow:"+(i===nearStop?"inset 0 1px rgba(255,255,255,.16)":"none")+";font:600 14px Arial;cursor:pointer";
             button.addEventListener("click",()=>{const C=window.__WRECKBOX_POSSESSION__;if(!C||!C.active||!C.npc)return;const entry=(lift.stops[i].sides||[]).find(v=>v.seg&&!v.seg.dead);if(!entry){try{MR("На этот этаж сейчас нет доступа.");}catch(_){}return;}C.npc.nav=null;C.npc.act=null;if(!Wy(C.npc,entry.seg,entry.x,{run:false,haz:false})){try{MR("Лифт не отвечает.");}catch(_){}}});
             grid.appendChild(button);
           });
-          panel.appendChild(grid);const foot=document.createElement("div");foot.textContent="ВЫБЕРИТЕ ЭТАЖ";foot.style.cssText="text-align:center;color:#91a5b6;font:10px system-ui;letter-spacing:1.5px";panel.appendChild(foot);
+          panel.appendChild(grid);const foot=document.createElement("div");foot.textContent="ВЫБЕРИТЕ ЭТАЖ";foot.style.cssText="text-align:center;color:#9d988b;font:10px Arial;letter-spacing:1.2px";panel.appendChild(foot);
         }
       },
     });
