@@ -46,32 +46,55 @@
         P.camera={x:pL.x,y:pL.y};if(P.enter(best))MR(r("Вы вселились в NPC. Нажмите E для выхода."),!0);
       },
       update(){
-        const P=window.__WRECKBOX_POSSESSION__;
-        if(!P||!P.active||!P.npc||P.npc.gone||P.npc.dead||P.npc.rag){if(P&&P.active&&P.npc&&(!P.npc||P.npc.gone||P.npc.dead||P.npc.rag))P.release();const old=document.getElementById("wzm-possession-lift");if(old)old.remove();return;}
-        const q=P.npc;
-        let lift=null,dist=1e9;
-        for(const e of kg.elevs){if(e.dead)continue;const d=Math.abs(e.sx-q.x);if(d<90&&d<dist){lift=e;dist=d;}}
-        let panel=document.getElementById("wzm-possession-lift");
+        const P=window.__WRECKBOX_POSSESSION__,panelId="wzm-possession-lift";
+        if(!P||!P.active||!P.npc||P.npc.gone||P.npc.dead||P.npc.rag){
+          if(P&&P.active&&P.npc&&(!P.npc||P.npc.gone||P.npc.dead||P.npc.rag))P.release();
+          const old=document.getElementById(panelId);if(old)old.remove();return;
+        }
+        const q=P.npc;let lift=null,nearStop=-1,best=1e9;
+        for(const e of kg.elevs){
+          if(e.dead||!e.stops||!e.hub)continue;
+          for(let i=0;i<e.stops.length;i++){
+            const stop=e.stops[i],floorY=6*stop.row-1;
+            for(const side of stop.sides||[]){
+              if(!side.seg||side.seg.dead)continue;
+              const dx=Math.abs(q.x-side.x),dy=Math.abs(q.y-floorY),score=dx+dy*1.35;
+              if(dx<48&&dy<46&&score<best){best=score;lift=e;nearStop=i;}
+            }
+          }
+        }
+        let panel=document.getElementById(panelId);
         if(!lift){if(panel)panel.remove();return;}
-        if(!panel){panel=document.createElement("div");panel.id="wzm-possession-lift";panel.style.cssText="position:fixed;z-index:99999;left:50%;bottom:86px;transform:translateX(-50%);display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:80vw;padding:8px;background:rgba(12,20,28,.92);border:1px solid #8de7ff;border-radius:8px;font:12px Arial;color:white";document.body.appendChild(panel);}
-        if(panel.dataset.elevator!==String(lift.id)){
-          panel.dataset.elevator=String(lift.id);panel.replaceChildren();
-          lift.stops.forEach((stop,i)=>{const b=document.createElement("button");b.type="button";b.textContent="Этаж "+(i+1);b.title="Вызвать лифт на этаж "+(i+1);b.style.cssText="padding:6px 9px;background:#263b49;color:white;border:1px solid #8de7ff;border-radius:5px;cursor:pointer";b.addEventListener("click",()=>{const P=window.__WRECKBOX_POSSESSION__;if(!P||!P.active||!P.npc)return;const link=lift.hub.links.find(x=>x.stop===i&&x.a);if(!link){try{MR("Не удалось найти площадку этого этажа.");}catch(_){}return;}P.npc.nav=null;P.npc.act=null;Wy(P.npc,link.a,link.ax,{run:false});});panel.appendChild(b);});
+        if(!panel){panel=document.createElement("div");panel.id=panelId;
+          panel.style.cssText="position:fixed;z-index:99999;right:22px;bottom:90px;display:flex;flex-direction:column;gap:5px;min-width:112px;padding:8px;background:#171b20;border:3px solid #697783;box-shadow:inset 0 0 0 2px #303a43,3px 3px 0 #080b0e;border-radius:2px;font:12px monospace;color:#dce8ee;image-rendering:pixelated";
+          document.body.appendChild(panel);
+        }
+        if(panel.dataset.elevator!==String(lift.id)||panel.dataset.floor!==String(nearStop)){
+          panel.dataset.elevator=String(lift.id);panel.dataset.floor=String(nearStop);panel.replaceChildren();
+          const head=document.createElement("div");head.textContent="ЛИФТ • ЭТАЖ "+(nearStop+1);
+          head.style.cssText="text-align:center;padding:4px 2px;color:#9eeaff;border-bottom:2px solid #596975;letter-spacing:1px";panel.appendChild(head);
+          const grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(3,1fr);gap:4px";
+          lift.stops.forEach((stop,i)=>{
+            const button=document.createElement("button");button.type="button";button.textContent=String(i+1);button.title="Вызвать лифт на этаж "+(i+1);
+            button.style.cssText="height:30px;background:"+(i===nearStop?"#294d5b":"#252c33")+";color:"+(i===nearStop?"#a8f0ff":"#f0f4f6")+";border:2px solid #596975;border-radius:1px;box-shadow:inset 1px 1px #8998a2,2px 2px 0 #080b0e;font:bold 13px monospace;cursor:pointer";
+            button.addEventListener("click",()=>{const C=window.__WRECKBOX_POSSESSION__;if(!C||!C.active||!C.npc)return;const entry=(lift.stops[i].sides||[]).find(v=>v.seg&&!v.seg.dead);if(!entry){try{MR("На этот этаж сейчас нет доступа.");}catch(_){}return;}C.npc.nav=null;C.npc.act=null;if(!Wy(C.npc,entry.seg,entry.x,{run:false,haz:false})){try{MR("Лифт не отвечает.");}catch(_){}}});
+            grid.appendChild(button);
+          });
+          panel.appendChild(grid);const foot=document.createElement("div");foot.textContent="НАЖМИТЕ ЭТАЖ";foot.style.cssText="text-align:center;color:#82939e;font:10px monospace;letter-spacing:1px";panel.appendChild(foot);
         }
       },
-      draw(ctx){const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q)return;const z=Math.max(.5,pL.zoom);ctx.save();ctx.textAlign="center";ctx.textBaseline="bottom";ctx.font="bold "+(12/z)+"px Arial";ctx.lineWidth=3/z;ctx.strokeStyle="#101820";ctx.fillStyle="#ffffff";ctx.strokeText("ВЫ",q.x,q.y-38/z);ctx.fillText("ВЫ",q.x,q.y-38/z);ctx.beginPath();ctx.moveTo(q.x-5/z,q.y-34/z);ctx.lineTo(q.x+5/z,q.y-34/z);ctx.lineTo(q.x,q.y-25/z);ctx.closePath();ctx.fillStyle="#8de7ff";ctx.fill();ctx.restore();}
+      draw(ctx){const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q)return;const z=Math.max(.5,pL.zoom);ctx.save();ctx.textAlign="center";ctx.textBaseline="bottom";ctx.font="bold "+(12/z)+"px Arial";ctx.lineWidth=3/z;ctx.strokeStyle="#101820";ctx.fillStyle="#ffffff";ctx.strokeText("ВЫ",q.x,q.y-88/z);ctx.fillText("ВЫ",q.x,q.y-38/z);ctx.beginPath();ctx.moveTo(q.x-5/z,q.y-83/z);ctx.lineTo(q.x+5/z,q.y-34/z);ctx.lineTo(q.x,q.y-73/z);ctx.closePath();ctx.fillStyle="#8de7ff";ctx.fill();ctx.restore();}
     });
     window.addEventListener("wzm-possession-door",()=>{
       const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q)return;
-      let best=null,bestD=42;
+      let chosen=null,fromA=false,best=54;
       for(const edge of kg.links){if(edge.dead||edge.type!=="door"||!edge.a||!edge.b)continue;
-        const da=Math.hypot(q.x-edge.ax,q.y-edge.a.y),db=Math.hypot(q.x-edge.bx,q.y-edge.b.y);
-        const d=Math.min(da,db);if(d<bestD){bestD=d;best={edge,fromA:da<=db};}
+        const da=Math.hypot(q.x-edge.ax,q.y-edge.ay),db=Math.hypot(q.x-edge.bx,q.y-edge.by);
+        if(Math.min(da,db)<best){best=Math.min(da,db);chosen=edge;fromA=da<=db;}
       }
-      if(!best){try{MR("Подойдите ближе к двери и нажмите E.");}catch(_){}return;}
-      const edge=best.edge,target=best.fromA?edge.b:edge.a,x=best.fromA?edge.bx:edge.ax;
-      q.nav=null;q.act=null;
-      if(!Wy(q,target,x,{run:false})){try{MR("Не удалось пройти через эту дверь.");}catch(_){}}
+      if(!chosen){try{MR("Подойдите вплотную к дверному проёму и нажмите E.");}catch(_){}return;}
+      const target=fromA?chosen.b:chosen.a,x=fromA?chosen.bx:chosen.ax;q.nav=null;q.act=null;
+      if(!Wy(q,target,x,{run:false,haz:false})){try{MR("Не удалось пройти через эту дверь.");}catch(_){}}
     });
     window.addEventListener("wzm-possession-release",()=>{const P=window.__WRECKBOX_POSSESSION__;const panel=document.getElementById("wzm-possession-lift");if(panel)panel.remove();if(P&&P.camera){pL.x=P.camera.x;pL.y=P.camera.y;P.camera=null;}});
     const WS=`;
@@ -127,9 +150,8 @@
         t.state="walk";t.lstate="walk";t.dir=dir||t.dir;
       }else if(dir){
         t.dir=dir;t.state="walk";t.lstate="walk";
-        const cur=Vg(t.x,t.y),tx=F(t.x+dir*120,8,m-8),target=Vg(tx,t.y)||Og(tx);
-        if(cur&&target&&cur!==target&&Wy(t,target,tx,{run:!!k.run,haz:!1}))n=Vy(t,e);
-        else n=k.run?t.runSpd:t.spd;
+        t.nav=null;
+        n=k.run?t.runSpd:t.spd;
         // The native collision/step-up code below handles each tread of an unlinked staircase.
         if(!t.nav&&!t.sc){const floor=Fg(t.x+dir*7);if(floor>0&&floor<t.y&&t.y-floor<=7&&Eg(t.x+dir*7,floor)&&!sx(t.x+dir*7,floor-27)){t.y=floor;t.fallY=floor;t.onGround=!0;}}
       }else{
