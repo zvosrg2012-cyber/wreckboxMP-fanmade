@@ -105,13 +105,21 @@
       if(t.__wzmReleaseAfterSc&&!t.sc){t.__wzmReleaseAfterSc=false;t.__wzmPossessed=false;t.nav=null;t.act=null;t.state="idle";t.lstate="idle";t.t=.2;}
       const dir=(k.right?1:0)-(k.left?1:0),vert=k.up?-1:k.down?1:0;
       const mode=vert?(vert<0?"up":"down"):dir?(dir<0?"left":"right"):"";
-      if(mode!==t.__wzmMoveDir){t.nav=null;t.act=null;t.__wzmMoveDir=mode;}
+      if(mode!==t.__wzmMoveDir){
+        // Keep an active stair/elevator route when the input changes from idle to W/S.
+        if(!vert&&!dir){t.nav=null;t.act=null;}
+        t.__wzmMoveDir=mode;
+      }
       t.pose="";t.act=null;t.t=999;t.blocked=0;
       if(t.nav){n=Vy(t,e);}
       else if(vert){
         const cur=Vg(t.x,t.y);let dest=null,targetX=t.x,best=1e9;
         if(cur){
-          for(const edge of cur.links){
+          // Search nearby stair links as well as cur.links: Vg may return a neighbouring
+          // floor node while the NPC is standing on the first tread.
+          const stairLinks=(kg.links||[]).filter(edge=>edge&&!edge.dead&&edge.type==="stair");
+          const candidates=[...(cur.links||[]),...stairLinks];
+          for(const edge of candidates){
             if(edge.type==="stair"){
               const other=edge.a===cur?edge.b:edge.a;
               if(!other||(vert<0?other.y>=cur.y-4:other.y<=cur.y+4))continue;
