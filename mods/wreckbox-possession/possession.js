@@ -78,20 +78,40 @@
     }
   };
   window.__WRECKBOX_POSSESSION__ = controller;
-  // Minimal persistent status label; the tool itself lives in the native tool palette.
-  const mountStatus = () => {
+  // Game-styled quick button and quiet status tag.
+  const mountUI = () => {
     if (document.getElementById('wzm-possession-status')) return;
     const style = document.createElement('style');
-    style.textContent = '#wzm-possession-status{position:fixed;z-index:2147483000;right:12px;bottom:10px;padding:4px 8px;border-radius:5px;background:rgba(20,24,27,.58);border:1px solid rgba(150,165,175,.22);color:rgba(220,228,232,.68);font:11px/1.2 Arial,sans-serif;pointer-events:none}';
+    style.textContent = `
+      #wzm-possession-status{position:fixed;z-index:2147483000;right:12px;bottom:10px;padding:3px 7px;border-radius:4px;background:rgba(24,27,29,.52);border:1px solid rgba(180,190,195,.16);color:rgba(225,230,232,.55);font:10px/1.2 Arial,sans-serif;pointer-events:none}
+      #wzm-possession-button{position:fixed;z-index:2147483001;right:12px;bottom:35px;display:flex;align-items:center;gap:8px;padding:9px 13px;min-width:128px;justify-content:center;border:1px solid rgba(210,220,225,.28);border-radius:6px;background:linear-gradient(180deg,rgba(65,72,77,.96),rgba(35,40,44,.97));color:#f0f1f2;font:600 13px Arial,sans-serif;letter-spacing:.2px;text-shadow:0 1px 2px #000;box-shadow:0 2px 7px rgba(0,0,0,.38),inset 0 1px rgba(255,255,255,.09);cursor:pointer;user-select:none}
+      #wzm-possession-button:hover{background:linear-gradient(180deg,rgba(82,92,98,.98),rgba(43,50,55,.98));border-color:rgba(225,235,240,.48)}
+      #wzm-possession-button:active{transform:translateY(1px);background:rgba(25,30,34,.98)}
+      #wzm-possession-button .wzm-icon{width:16px;height:16px;display:block;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+    `;
     document.head.appendChild(style);
     const status = document.createElement('div');
     status.id = 'wzm-possession-status';
     status.textContent = 'Мод на вселение активен';
     document.body.appendChild(status);
+    const button = document.createElement('button');
+    button.id = 'wzm-possession-button';
+    button.type = 'button';
+    button.innerHTML = '<svg class="wzm-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.4"/><path d="M5 21c.5-4.1 2.8-6.2 7-6.2s6.5 2.1 7 6.2"/></svg><span>Вселение</span>';
+    button.addEventListener('click', () => {
+      if (controller.active) controller.release();
+      if (typeof window.__WRECKBOX_SELECT_POSSESSION__ === 'function') {
+        window.__WRECKBOX_SELECT_POSSESSION__();
+        status.textContent = 'Выберите NPC';
+      } else {
+        status.textContent = 'Мод загружается…';
+      }
+    });
+    document.body.appendChild(button);
   };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountStatus, {once:true});
-  else mountStatus();
-  window.addEventListener('load', mountStatus, {once:true});
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountUI, {once:true});
+  else mountUI();
+  window.addEventListener('load', mountUI, {once:true});
 
   window.addEventListener('keydown', e => controller.keydown(e), true);
   window.addEventListener('keyup', e => controller.keyup(e), true);
