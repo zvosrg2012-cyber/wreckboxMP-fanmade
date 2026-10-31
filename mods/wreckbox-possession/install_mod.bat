@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-echo WreckboxMP - Vselenие mod installer
+echo WreckboxMP - Possession mod installer
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0install_mod.ps1"
 if errorlevel 1 (
   echo Installation failed. Read the error above.
