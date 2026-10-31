@@ -63,6 +63,7 @@
       },
       update(){
         const P=window.__WRECKBOX_POSSESSION__,panelId="wzm-possession-lift";
+        if(P&&P.dbg){P.dbg.upd++;P.dbg.lastUpd=performance.now();}
         if(!P||!P.active||!P.npc||P.npc.gone||P.npc.dead||P.npc.rag){
           if(P&&P.active&&P.npc&&(!P.npc||P.npc.gone||P.npc.dead||P.npc.rag))P.release();
           const old=document.getElementById(panelId);if(old)old.remove();return;
@@ -127,11 +128,23 @@
       if(!Wy(q,target,x,{run:false,haz:false})){try{MR("Не удалось пройти через эту дверь.");}catch(_){}}
     });
     window.addEventListener("wzm-possession-release",()=>{const P=window.__WRECKBOX_POSSESSION__;const panel=document.getElementById("wzm-possession-lift");if(panel)panel.remove();if(P&&P.camera){pL.x=P.camera.x;pL.y=P.camera.y;P.camera=null;}});
+    // Diagnostics (F8 overlay in possession.js): publish NPC and camera values from inside the game scope,
+    // on a timer that does not depend on the game loop or on the tool's update(). Does nothing unless enabled.
+    setInterval(function(){try{
+      const P=window.__WRECKBOX_POSSESSION__;if(!P||!P.debug||!P.dbg)return;
+      const D=P.dbg,q=P.active&&P.npc;if(!q){D.snap=null;D.lossFrom=0;return;}
+      const now=performance.now(),sc=q.sc||null,err=Math.hypot(pL.x-q.x,pL.y-(q.y-72)),warm=now-(D.enterAt||0)<1500;
+      D.snap={x:q.x,y:q.y,state:q.state,sc:sc&&sc.type||"",nav:!!q.nav,ground:!!q.onGround,camX:pL.x,camY:pL.y,err:err};
+      if(warm){D.lossFrom=0;}
+      else if(err>40){if(!D.lossFrom){D.lossFrom=now;D.lossMax=0;D.lossCtx=(sc&&sc.type||"-")+" / "+q.state;}D.lossMax=Math.max(D.lossMax,err);}
+      else if(D.lossFrom){const dur=now-D.lossFrom;D.lossFrom=0;if(dur>300){D.losses.unshift(D.lossCtx+", "+Math.round(dur)+" мс, макс. "+Math.round(D.lossMax)+" px");if(D.losses.length>6)D.losses.pop();}}
+    }catch(_){}},200);
     const WS=`;
     replaceOnce(toolMarker, toolMarker.replace('const WS=', toolCode), 'tool registration');
 
     const movement = `let n=0;if(t.__wzmPossessed){
       const P=window.__WRECKBOX_POSSESSION__,k=P.keys;
+      if(P.dbg){P.dbg.move++;P.dbg.lastMove=performance.now();P.dbg.moveDt=e;}
       if(t.__wzmReleaseAfterSc&&!t.sc){t.__wzmReleaseAfterSc=false;t.__wzmPossessed=false;t.nav=null;t.act=null;t.state="idle";t.lstate="idle";t.t=.2;}
       const dir=(k.right?1:0)-(k.left?1:0),vert=k.up?-1:k.down?1:0;
       const mode=vert?(vert<0?"up":"down"):dir?(dir<0?"left":"right"):"";

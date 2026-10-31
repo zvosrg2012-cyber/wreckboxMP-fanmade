@@ -59,6 +59,7 @@
       if (this.active) this.release();
       this.npc = npc;
       this.active = true;
+      if (this.dbg) this.dbg.enterAt = performance.now();
       this.clearKeys();
       npc.__wzmPossessed = true;
       npc.__wzmMoveDir = '';
@@ -157,6 +158,7 @@
       .wzm-lift__btn[aria-current='true']{--lamp:#fff6d0;cursor:default;color:var(--accent-ink);
         background:linear-gradient(var(--lamp),var(--lamp)) 50% 0 / 16px 3px no-repeat,radial-gradient(ellipse 110% 150% at 50% 0,#ffe596,var(--accent) 58%,#dc9f00)}
       .wzm-lift__foot{margin-top:10px;text-align:center;font:600 10.5px/1 var(--font-ui);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim)}
+      #wzm-debug{position:fixed;z-index:7;left:12px;top:calc(env(safe-area-inset-top,0px) + 84px);margin:0;padding:8px 10px;max-width:min(92vw,560px);font:11px/1.45 var(--font-mono);color:var(--ink);white-space:pre-wrap;pointer-events:none}
       /* Touch: bottom corners belong to the pad and action buttons, so the panel sits under the HUD. */
       body.touch .wzm-lift{top:calc(env(safe-area-inset-top,0px) + 76px);bottom:auto;right:10px;width:168px}
       body.touch .wzm-lift__btn{height:44px}
@@ -251,5 +253,56 @@
     setInterval(refresh,300);refresh();
   };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mountTouchControls,{once:true});else mountTouchControls();
+
+  // Diagnostics overlay, toggled with F8. The hook publishes NPC/camera values from inside the game
+  // (independently of the game loop) and counts calls of update() and of the possessed-NPC movement
+  // branch; this overlay only displays them. It exists to find out why the camera stops following the
+  // NPC on stairs and in elevators: which transition (sc) is active, how far the camera lags behind,
+  // and whether update()/movement keep running during the transition.
+  controller.debug = false;
+  controller.dbg = { upd:0, move:0, lastUpd:0, lastMove:0, moveDt:0, snap:null, lossFrom:0, lossCtx:'', lossMax:0, losses:[] };
+  let debugEl = null, debugPrev = null;
+  const renderDebug = () => {
+    if (!controller.debug) return;
+    if (!debugEl) {
+      debugEl = document.createElement('pre');
+      debugEl.id = 'wzm-debug';
+      debugEl.className = 'panel';
+      document.body.appendChild(debugEl);
+    }
+    const d = controller.dbg, now = performance.now();
+    const perSec = (a, b, dt) => (dt > 0 ? Math.round((a - b) * 1000 / dt) : 0);
+    let updRate = 0, moveRate = 0;
+    if (debugPrev) {
+      const dt = now - debugPrev.t;
+      updRate = perSec(d.upd, debugPrev.upd, dt);
+      moveRate = perSec(d.move, debugPrev.move, dt);
+    }
+    debugPrev = { t: now, upd: d.upd, move: d.move };
+    const ago = t => (t ? Math.round(now - t) + ' мс назад' : 'ещё не было');
+    const s = d.snap, lines = ['ДИАГНОСТИКА ВСЕЛЕНИЯ · F8 — скрыть'];
+    if (!controller.active || !s) {
+      lines.push('вселение не активно');
+    } else {
+      lines.push('NPC: x=' + Math.round(s.x) + ' y=' + Math.round(s.y) + ' state=' + s.state + ' sc=' + (s.sc || '-') + ' nav=' + (s.nav ? 'да' : 'нет') + ' на земле=' + (s.ground ? 'да' : 'нет'));
+      lines.push('камера: x=' + Math.round(s.camX) + ' y=' + Math.round(s.camY) + ' отставание=' + s.err.toFixed(1) + ' px' + (s.err > 40 ? '  <-- КАМЕРА ПОТЕРЯНА' : ''));
+    }
+    lines.push('update() инструмента: ' + updRate + '/с, последний ' + ago(d.lastUpd));
+    lines.push('ветка движения NPC: ' + moveRate + '/с, последняя ' + ago(d.lastMove));
+    if (d.lossFrom) lines.push('камера потеряна уже ' + Math.round(now - d.lossFrom) + ' мс (' + d.lossCtx + ')');
+    d.losses.forEach(l => lines.push('была потеря: ' + l));
+    debugEl.textContent = lines.join('\n');
+  };
+  const toggleDebug = () => {
+    controller.debug = !controller.debug;
+    if (!controller.debug && debugEl) { debugEl.remove(); debugEl = null; debugPrev = null; }
+    renderDebug();
+  };
+  window.addEventListener('keydown', e => {
+    if (e.code !== 'F8' || e.repeat) return;
+    e.preventDefault();
+    toggleDebug();
+  }, true);
+  setInterval(renderDebug, 250);
 
 })();
