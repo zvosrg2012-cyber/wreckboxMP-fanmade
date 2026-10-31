@@ -26,6 +26,8 @@
     replaceOnce('const OL=t=>', 'PL.possession=' + JSON.stringify(toolIcon) + ';const OL=t=>', 'custom icon');
     replaceOnce('function Ny(t,e){const n=t.sc,o=t.nav;if("act"!==t.state)if("stair"===n.type', 'function Ny(t,e){const n=t.sc,o=t.nav;if("act"!==t.state&&!t.__wzmPossessed)if("stair"===n.type', 'possessed door and elevator transitions');
 
+    replaceOnce('function RA(t){if(!OS[t])return;', 'function RA(t){window.__WRECKBOX_SELECT_POSSESSION__=()=>RA("possession");if(!OS[t])return;', 'native tool selector');
+
     const toolMarker = 'BS("camera",{name:r("Камера"),icon:"move",hint:r("Перетаскивайте вид. Колесо или щипок — зум."),mode:"both"});const WS=';
     const toolCode = `BS("possession",{
       name:r("Вселение"),icon:"possession",
