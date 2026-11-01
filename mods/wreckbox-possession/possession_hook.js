@@ -39,8 +39,26 @@
       'tool list'
     );
     replaceOnce('LA=["camera","brush","building","furniture","explosives","people","eraser"]', 'LA=["camera","possession","brush","building","furniture","explosives","people","eraser"]', 'build tool list');
-    replaceOnce('const OL=t=>', 'PL.possession=' + JSON.stringify(toolIcon) + ';const OL=t=>', 'custom icon');
-    replaceOnce('function Ny(t,e){const n=t.sc,o=t.nav;if("act"!==t.state)if("stair"===n.type', 'function Ny(t,e){const n=t.sc,o=t.nav;if("act"!==t.state&&!t.__wzmPossessed)if("stair"===n.type', 'possessed door and elevator transitions');
+    // Minified names differ between builds of the game, so they are looked up instead of hard-coded.
+    // Old build: camera pL, icon object PL + marker "const OL=t=>", transition updater Ny. New build: dL, zL, _y.
+    let CAM = 'pL', CLAMP = '';
+    const camMatch = source.match(/const (\w+)=\{x:[-\d.e]+,y:[-\d.e]+,zoom:[-\d.e]+,vx:0,vy:0,minZoom/);
+    if (camMatch) CAM = camMatch[1];
+    const clampMatch = source.match(new RegExp('function (\\w+)\\(\\)\\{' + CAM + '\\.zoom=F\\(' + CAM + '\\.zoom,' + CAM + '\\.minZoom,' + CAM + '\\.maxZoom\\)'));
+    if (clampMatch) CLAMP = clampMatch[1];
+    const iconMatch = source.match(/const (\w+)=t=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true">\$\{(\w+)\[t\]\|\|""\}<\/svg>`/);
+    if (iconMatch) replaceOnce(iconMatch[0], iconMatch[2] + '.possession=' + JSON.stringify(toolIcon) + ';' + iconMatch[0], 'custom icon (icon table)');
+    else replaceOnce('const OL=t=>', 'PL.possession=' + JSON.stringify(toolIcon) + ';const OL=t=>', 'custom icon');
+    const scMatch = source.match(/function (\w+)\(t,e\)\{const n=t\.sc,o=t\.nav;if\("act"!==t\.state\)if\("stair"===n\.type/);
+    if (!scMatch) throw new Error('Possession mod: game marker missing: possessed door and elevator transitions');
+    replaceOnce(scMatch[0], scMatch[0].replace('if("act"!==t.state)', 'if("act"!==t.state&&!t.__wzmPossessed)'), 'possessed door and elevator transitions');
+    // Injected code is written with the old names (pL, MR); translate it for this build.
+    // Read-only window into the game's internals for diagnostics and for automated tests (getters: some of these
+    // constants are declared later in the game source than the point where this code runs).
+    const WZ_EXPOSE = 'window.__WZM_GAME__={get mm(){return mm},get kg(){return kg},get cam(){return ' + CAM + '},get IS(){return IS},get Eg(){return Eg},get Fg(){return Fg},get Vg(){return Vg},get ET(){return ET}};';
+    const WZ_HELPERS = 'const WZMSG=(m)=>{try{const n=document.getElementById("toast");if(!n)return;n.textContent=String(m);n.classList.add("show");clearTimeout(window.__wzmToastT);window.__wzmToastT=setTimeout(()=>n.classList.remove("show"),2600);}catch(_){}};' +
+      'const WZMCLAMP=()=>{' + (CLAMP ? 'try{' + CLAMP + '()}catch(_){}' : '') + '};';
+    const adapt = (code) => code.replace(/\bpL\b/g, CAM).replace(/\bMR\(/g, 'WZMSG(');
 
     // Optional patch: a failed marker here only drops this one feature (the rest of the mod still works).
     const replaceOptional = (needle, replacement, label) => {
@@ -95,7 +113,7 @@
         // transitions temporarily take over movement and skip the custom movement branch.
         pL.x += (q.x - pL.x) * 0.22;
         pL.y += (q.y - 72 - pL.y) * 0.22;
-        pL.vx = 0; pL.vy = 0;
+        pL.vx = 0; pL.vy = 0; WZMCLAMP();
         let lift=null,nearStop=-1,best=1e9;
         for(const e of kg.elevs){
           if(e.dead||!e.stops||!e.hub)continue;
@@ -181,7 +199,7 @@
         q.nav={steps:[{type:"bypass",from:side.from,to:side.to,x0:side.x0,x:side.x}],i:0,sub:0,node:side.to,x:side.x,run:!1,px:q.x,stuck:0,noElev:!0};
       }
     });
-    window.addEventListener("wzm-possession-release",()=>{const P=window.__WRECKBOX_POSSESSION__;const panel=document.getElementById("wzm-possession-lift");if(panel)panel.remove();if(P&&P.camera){pL.x=P.camera.x;pL.y=P.camera.y;P.camera=null;}});
+    window.addEventListener("wzm-possession-release",()=>{const P=window.__WRECKBOX_POSSESSION__;const panel=document.getElementById("wzm-possession-lift");if(panel)panel.remove();if(P&&P.camera){pL.x=P.camera.x;pL.y=P.camera.y;WZMCLAMP();P.camera=null;}});
     // Diagnostics (F8 overlay in possession.js): publish NPC and camera values from inside the game scope,
     // on a timer that does not depend on the game loop or on the tool's update(). Does nothing unless enabled.
     setInterval(function(){try{
@@ -194,7 +212,7 @@
       else if(D.lossFrom){const dur=now-D.lossFrom;D.lossFrom=0;if(dur>300){D.losses.unshift(D.lossCtx+", "+Math.round(dur)+" мс, макс. "+Math.round(D.lossMax)+" px");if(D.losses.length>6)D.losses.pop();}}
     }catch(_){}},200);
     const WS=`;
-    replaceOnce(toolMarker, toolMarker.replace('const WS=', toolCode), 'tool registration');
+    replaceOnce(toolMarker, toolMarker.replace('const WS=', WZ_HELPERS + WZ_EXPOSE + adapt(toolCode)), 'tool registration');
 
     const movement = `let n=0;if(t.__wzmPossessed){
       const P=window.__WRECKBOX_POSSESSION__,k=P.keys;
@@ -272,9 +290,9 @@
       }
       if(k.jump&&t.onGround&&!t.sc){t.vy=-205;t.onGround=!1;t.fallY=t.y;t.state="idle";t.lstate="idle";n=0;k.jump=false;}
       if(dir&&!t.sc){t.state="walk";t.lstate="walk";t.t=999;}
-      P.npc===t&&(pL.x+=(t.x-pL.x)*Math.min(1,12*e),pL.y+=(t.y-72-pL.y)*Math.min(1,12*e),pL.vx=0,pL.vy=0);
+      P.npc===t&&(pL.x+=(t.x-pL.x)*Math.min(1,12*e),pL.y+=(t.y-72-pL.y)*Math.min(1,12*e),pL.vx=0,pL.vy=0,WZMCLAMP());
     }else switch(t.state){case"idle":;`;
-    replaceOnce('let n=0;switch(t.state){case"idle":', movement, 'native NPC movement');
+    replaceOnce('let n=0;switch(t.state){case"idle":', adapt(movement), 'native NPC movement');
 
     // possession.js shows its fallback toolbar button only when this flag is set.
     window.__WRECKBOX_POSSESSION_READY__ = true;
