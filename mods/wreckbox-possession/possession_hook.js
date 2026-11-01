@@ -50,12 +50,13 @@
     // Door and "bypass" (crossing a house to the ground on its other side) transitions of a possessed NPC. The game hides the NPC at y=-1e5 for the whole teleport, so the
     // camera used to fly away and snap back (jerk). Instead a semi-transparent copy of the NPC walks from the
     // entry door to the exit door in exactly the time the teleport takes, and the camera follows it.
+    // The walking animation needs |vx|>4 and onGround (that is what the game's pose code checks), and ph advancing.
     // NB: this block sits inside a case block that declares its own `e` later, so it must not use `e`.
     replaceOptional(
       'case"door":case"bypass":case"off":{const e="door"===n.type?.35:.6;',
       'case"door":case"bypass":case"off":{if(t.__wzmPossessed&&("door"===n.type||"bypass"===n.type)){' +
         'const wzmRamp=Math.max(.05,Math.min(.35,n.dur/3)),wzmP=Math.min(1,n.t/n.dur);' +
-        't.hidden=!1;t.vx=0;t.dir=n.bx>=n.ax?1:-1;t.ph=n.t*4.2;' +
+        'if(void 0===n.wzmPh)n.wzmPh=t.ph||0;t.hidden=!1;t.onGround=!0;t.dir=n.bx>=n.ax?1:-1;t.vx=24*t.dir;t.ph=n.wzmPh+n.t*4.2;' +
         't.x=n.ax+(n.bx-n.ax)*wzmP;t.y=n.ay+(n.by-n.ay)*wzmP;' +
         't.fade=.42*Math.max(0,Math.min(1,n.t/wzmRamp,(n.dur-n.t)/wzmRamp));' +
         'if(a>=1){t.x=n.bx;t.y=n.by;if("bypass"===n.type){const wzmY=Fg(t.x);if(wzmY>=0)t.y=wzmY;}t.fade=0;if(!Eg(t.x,t.y)){t.x=n.ax;t.y=n.ay;t.nav=null;t.act=null;}r(1+(n.skip||0));}' +
@@ -137,6 +138,20 @@
         }
       },
     });
+    // Crossing a building: the ground zone ends at the house, the next zone starts on its other side. Same rule as the
+    // game's own "bypass" link (gap of at most 220 columns). "only" limits it to one direction (-1/1), 0 = both.
+    window.__WZM_HOUSE__=(q,cur,only)=>{
+      if(!cur||!cur.zone||kg.zones[cur.id]!==cur)return null;
+      let side=null,score=1e9;
+      for(const d of[-1,1]){
+        if(only&&d!==only)continue;
+        const nz=kg.zones[cur.id+d];if(!nz)continue;
+        const o=d>0?cur.c1+1:nz.c1+1,a=d>0?nz.c0-1:cur.c0-1;if(a-o>220)continue;
+        const ex=6*((d>0?cur.c1:cur.c0)+.5),dx=Math.abs(q.x-ex);
+        if(dx<score){score=dx;side={from:cur,to:nz,x0:ex,x:6*((d>0?nz.c0:nz.c1)+.5),dx:dx};}
+      }
+      return side;
+    };
     window.addEventListener("wzm-possession-door",()=>{
       const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q||q.sc)return;
       // A door link stores one end per node: (ax on node a) and (bx on node b). The game's door links have no
@@ -151,17 +166,10 @@
         const sa=cur===edge.b?1e9:score(edge.ax,ay),sb=cur===edge.a?1e9:score(edge.bx,by);
         if(Math.min(sa,sb)<best){best=Math.min(sa,sb);chosen=edge;fromA=sa<=sb;}
       }
-      // Ground next to a building: the game's "bypass" link moves a person from the end of this ground zone to the
-      // start of the next one, i.e. to the other side of the house. Same rules as the game (gap of at most 220 columns).
-      let side=null,sideScore=1e9;
-      if(cur&&cur.zone&&kg.zones[cur.id]===cur){
-        for(const d of[-1,1]){
-          const nz=kg.zones[cur.id+d];if(!nz)continue;
-          const o=d>0?cur.c1+1:nz.c1+1,a=d>0?nz.c0-1:cur.c0-1;if(a-o>220)continue;
-          const ex=6*((d>0?cur.c1:cur.c0)+.5),dx=Math.abs(q.x-ex);
-          if(dx<90&&dx<sideScore){sideScore=dx;side={from:cur,to:nz,x0:ex,x:6*((d>0?nz.c0:nz.c1)+.5)};}
-        }
-      }
+      // Ground next to a building: E moves the NPC to the ground on the other side of the house.
+      const gz=cur&&cur.zone?cur:Og(q.x);
+      let side=window.__WZM_HOUSE__(q,gz,0),sideScore=side?side.dx:1e9;
+      if(side&&side.dx>=140){side=null;sideScore=1e9;}
       // Prefer a door when one is within reach; otherwise cross to the other side of the house.
       if(!chosen&&!side){try{MR("Подойдите вплотную к двери или к краю дома и нажмите E.");}catch(_){}return;}
       q.act=null;
@@ -243,8 +251,15 @@
         // Free walking may only follow plain steps. A route from a stair landing or lift stop to the ground (or to
         // another room) goes over stair/elev/door links; that is what used to drag the NPC back onto the stairs
         // or into the elevator as soon as it walked out of their range. Such routes are dropped: just walk.
+        // Walking into the edge of the ground next to a house for a moment crosses to its other side (like the game's NPCs do).
+        const hs=cur&&cur.zone?window.__WZM_HOUSE__(t,cur,dir):null;
+        if(hs&&hs.dx<8){
+          t.__wzmEdge=(t.__wzmEdge||0)+e;
+          if(t.__wzmEdge>.3){t.__wzmEdge=0;t.nav={steps:[{type:"bypass",from:hs.from,to:hs.to,x0:hs.x0,x:hs.x}],i:0,sub:0,node:hs.to,x:hs.x,run:!1,px:t.x,stuck:0,noElev:!0};}
+        }else t.__wzmEdge=0;
         let routed=!1;
-        if(cur&&target&&cur!==target&&Wy(t,target,tx,{run:!!k.run,haz:!1})){
+        if(t.nav&&t.nav.steps&&t.nav.steps[0]&&t.nav.steps[0].type==="bypass")routed=!0;
+        if(!routed&&cur&&target&&cur!==target&&Wy(t,target,tx,{run:!!k.run,haz:!1})){
           if(t.nav&&t.nav.steps&&t.nav.steps.every(s=>s.type==="walk"||s.type==="cross"||s.type==="bypass"))routed=!0;
           else t.nav=null;
         }
