@@ -42,6 +42,27 @@
     replaceOnce('const OL=t=>', 'PL.possession=' + JSON.stringify(toolIcon) + ';const OL=t=>', 'custom icon');
     replaceOnce('function Ny(t,e){const n=t.sc,o=t.nav;if("act"!==t.state)if("stair"===n.type', 'function Ny(t,e){const n=t.sc,o=t.nav;if("act"!==t.state&&!t.__wzmPossessed)if("stair"===n.type', 'possessed door and elevator transitions');
 
+    // Optional patch: a failed marker here only drops this one feature (the rest of the mod still works).
+    const replaceOptional = (needle, replacement, label) => {
+      if (!source.includes(needle)) { console.warn('Possession mod: optional patch skipped, marker missing: ' + label); return false; }
+      source = source.replace(needle, replacement); return true;
+    };
+    // Door transition for a possessed NPC. The game hides the NPC at y=-1e5 for the whole teleport, so the
+    // camera used to fly away and snap back (jerk). Instead a semi-transparent copy of the NPC walks from the
+    // entry door to the exit door in exactly the time the teleport takes, and the camera follows it.
+    // NB: this block sits inside a case block that declares its own `e` later, so it must not use `e`.
+    replaceOptional(
+      'case"door":case"bypass":case"off":{const e="door"===n.type?.35:.6;',
+      'case"door":case"bypass":case"off":{if(t.__wzmPossessed&&"door"===n.type){' +
+        'const wzmRamp=Math.max(.05,Math.min(.35,n.dur/3)),wzmP=Math.min(1,n.t/n.dur);' +
+        't.hidden=!1;t.vx=0;t.dir=n.bx>=n.ax?1:-1;t.ph=n.t*4.2;' +
+        't.x=n.ax+(n.bx-n.ax)*wzmP;t.y=n.ay+(n.by-n.ay)*wzmP;' +
+        't.fade=.42*Math.max(0,Math.min(1,n.t/wzmRamp,(n.dur-n.t)/wzmRamp));' +
+        'if(a>=1){t.x=n.bx;t.y=n.by;t.fade=0;if(!Eg(t.x,t.y)){t.x=n.ax;t.y=n.ay;t.nav=null;t.act=null;}r(1+(n.skip||0));}' +
+        'break;}const e="door"===n.type?.35:.6;',
+      'ghost door transition'
+    );
+
     replaceOnce('function RA(t){if(!OS[t])return;', 'window.__WRECKBOX_SELECT_POSSESSION__=()=>RA("possession");function RA(t){if(!OS[t])return;', 'native tool selector');
 
     const toolMarker = 'BS("camera",{name:r("Камера"),icon:"move",hint:r("Перетаскивайте вид. Колесо или щипок — зум."),mode:"both"});const WS=';
@@ -117,15 +138,24 @@
       },
     });
     window.addEventListener("wzm-possession-door",()=>{
-      const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q)return;
-      let chosen=null,fromA=false,best=54;
-      for(const edge of kg.links){if(edge.dead||edge.type!=="door"||!edge.a||!edge.b)continue;
-        const da=Math.hypot(q.x-edge.ax,q.y-edge.ay),db=Math.hypot(q.x-edge.bx,q.y-edge.by);
-        if(Math.min(da,db)<best){best=Math.min(da,db);chosen=edge;fromA=da<=db;}
+      const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q||q.sc)return;
+      // A door link stores one end per node: (ax on node a) and (bx on node b). The game's door links have no
+      // ay/by; the floor height of an end is its node's y. (The old code read edge.ay/edge.by, got NaN, and
+      // never found a door.) The NPC may stand at either end, so both ends are checked.
+      const cur=Vg(q.x,q.y);
+      let chosen=null,fromA=false,best=1e9;
+      for(const edge of kg.links){
+        if(edge.dead||edge.type!=="door"||!edge.a||!edge.b||edge.a.dead||edge.b.dead)continue;
+        const ay=edge.ay!==undefined?edge.ay:edge.a.y,by=edge.by!==undefined?edge.by:edge.b.y;
+        const score=(x,y)=>Math.abs(q.x-x)<64&&Math.abs(q.y-y)<40?Math.abs(q.x-x)+Math.abs(q.y-y)*1.5:1e9;
+        const sa=cur===edge.b?1e9:score(edge.ax,ay),sb=cur===edge.a?1e9:score(edge.bx,by);
+        if(Math.min(sa,sb)<best){best=Math.min(sa,sb);chosen=edge;fromA=sa<=sb;}
       }
       if(!chosen){try{MR("Подойдите вплотную к дверному проёму и нажмите E.");}catch(_){}return;}
-      const target=fromA?chosen.b:chosen.a,x=fromA?chosen.bx:chosen.ax;q.nav=null;q.act=null;
-      if(!Wy(q,target,x,{run:false,haz:false})){try{MR("Не удалось пройти через эту дверь.");}catch(_){}}
+      const from=fromA?chosen.a:chosen.b,to=fromA?chosen.b:chosen.a,x0=fromA?chosen.ax:chosen.bx,x1=fromA?chosen.bx:chosen.ax;
+      // Build the route step by hand so exactly this door is used (a general route search could pick another way).
+      q.act=null;
+      q.nav={steps:[{type:"door",L:chosen,rev:!fromA,from:from,to:to,x0:x0,x:x1}],i:0,sub:0,node:to,x:x1,run:!1,px:q.x,stuck:0,noElev:!0};
     });
     window.addEventListener("wzm-possession-release",()=>{const P=window.__WRECKBOX_POSSESSION__;const panel=document.getElementById("wzm-possession-lift");if(panel)panel.remove();if(P&&P.camera){pL.x=P.camera.x;pL.y=P.camera.y;P.camera=null;}});
     // Diagnostics (F8 overlay in possession.js): publish NPC and camera values from inside the game scope,
@@ -194,7 +224,15 @@
       }else if(dir){
         t.dir=dir;t.state="walk";t.lstate="walk";
         const cur=Vg(t.x,t.y),tx=F(t.x+dir*120,8,m-8),target=Vg(tx,t.y)||Og(tx);
-        if(cur&&target&&cur!==target&&Wy(t,target,tx,{run:!!k.run,haz:!1}))n=Vy(t,e);
+        // Free walking may only follow plain steps. A route from a stair landing or lift stop to the ground (or to
+        // another room) goes over stair/elev/door links; that is what used to drag the NPC back onto the stairs
+        // or into the elevator as soon as it walked out of their range. Such routes are dropped: just walk.
+        let routed=!1;
+        if(cur&&target&&cur!==target&&Wy(t,target,tx,{run:!!k.run,haz:!1})){
+          if(t.nav&&t.nav.steps&&t.nav.steps.every(s=>s.type==="walk"||s.type==="cross"||s.type==="bypass"))routed=!0;
+          else t.nav=null;
+        }
+        if(routed)n=Vy(t,e);
         else n=k.run?t.runSpd:t.spd;
         // The native collision/step-up code below handles each tread of an unlinked staircase.
         if(!t.nav&&!t.sc){const floor=Fg(t.x+dir*7);if(floor>0&&floor<t.y&&t.y-floor<=7&&Eg(t.x+dir*7,floor)&&!sx(t.x+dir*7,floor-27)){t.y=floor;t.fallY=floor;t.onGround=!0;}}
