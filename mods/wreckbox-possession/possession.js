@@ -587,13 +587,13 @@
     if (q.dead || q.gone) { toast('Вас убили'); controller.release(); return; }
     const v = viewState(q, g);
     let seen = 0, hid = 0;
-    const fadeStep = Math.min(1, Math.max(0.08, (nowMs - (controller.vision.lastAt || nowMs - 16)) / 150));
+    const fadeDt = Math.min(50, Math.max(0, nowMs - (controller.vision.lastAt || nowMs - 16)));
     controller.vision.lastAt = nowMs;
     for (const r of g.mm) {
       if (r === q) { r.__wzmUnseen = false; continue; }
       const ok = canSee(g, v, r);
       const previous = typeof r.__wzmVisionAlpha === 'number' ? r.__wzmVisionAlpha : 1;
-      const alpha = previous + ((ok ? 1 : 0) - previous) * fadeStep;
+      const alpha = ok ? Math.min(1, previous + fadeDt / 90) : Math.max(0, previous - fadeDt / 220);
       r.__wzmVisionAlpha = alpha;
       r.__wzmUnseen = alpha <= 0.015;
       if (alpha < 0.999 && !r.rag) {
