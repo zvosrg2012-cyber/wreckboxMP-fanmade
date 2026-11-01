@@ -55,7 +55,7 @@
     // Injected code is written with the old names (pL, MR); translate it for this build.
     // Read-only window into the game's internals for diagnostics and for automated tests (getters: some of these
     // constants are declared later in the game source than the point where this code runs).
-    const WZ_EXPOSE = 'window.__WZM_GAME__={get mm(){return mm},get kg(){return kg},get cam(){return ' + CAM + '},get IS(){return IS},get Eg(){return Eg},get Fg(){return Fg},get Vg(){return Vg},get ET(){return ET},get gt(){try{return gt}catch(_){return null}},get vt(){try{return vt}catch(_){return null}},get mt(){try{return mt}catch(_){return 192}},get gw(){try{return u}catch(_){return 0}},get st(){try{return st}catch(_){return null}}};';
+    const WZ_EXPOSE = 'window.__WZM_GAME__={get mm(){return mm},get kg(){return kg},get cam(){return ' + CAM + '},get IS(){return IS},get Eg(){return Eg},get Fg(){return Fg},get Vg(){return Vg},get ET(){return ET},get gt(){try{return gt}catch(_){return null}},get vt(){try{return vt}catch(_){return null}},get mt(){try{return mt}catch(_){return 192}},get gw(){try{return u}catch(_){return 0}},get st(){try{return st}catch(_){return null}},get px(){try{return px}catch(_){return null}},get bx(){try{return bx}catch(_){return null}}};';
     const WZ_HELPERS = 'const WZMSG=(m)=>{try{const n=document.getElementById("toast");if(!n)return;n.textContent=String(m);n.classList.add("show");clearTimeout(window.__wzmToastT);window.__wzmToastT=setTimeout(()=>n.classList.remove("show"),2600);}catch(_){}};' +
       'const WZMCLAMP=()=>{' + (CLAMP ? 'try{' + CLAMP + '()}catch(_){}' : '') + '};';
     const adapt = (code) => code.replace(/\bpL\b/g, CAM).replace(/\bMR\(/g, 'WZMSG(');
@@ -223,13 +223,13 @@
     replaceOnce(toolMarker, toolMarker.replace('const WS=', WZ_HELPERS + WZ_EXPOSE + adapt(toolCode)), 'tool registration');
 
     const movement = `let n=0;if(t.__wzmPossessed){
-      const P=window.__WRECKBOX_POSSESSION__,k=P.keys,AIM=!!(P.aim&&P.aim.on),RUN=!!k.run&&!AIM;
+      const P=window.__WRECKBOX_POSSESSION__,k=P.keys,AIM=!!(P.aim&&P.aim.on),RUN=!!k.run&&!AIM,ATK=!!(P.atk&&P.atk.until>performance.now());
       if(P.dbg){P.dbg.move++;P.dbg.lastMove=performance.now();P.dbg.moveDt=e;}
       if(t.__wzmReleaseAfterSc&&!t.sc){t.__wzmReleaseAfterSc=false;t.__wzmPossessed=false;t.nav=null;t.act=null;t.state="idle";t.lstate="idle";t.t=.2;}
       const dir=(k.right?1:0)-(k.left?1:0),vert=k.up?-1:k.down?1:0;
       const mode=vert?(vert<0?"up":"down"):dir?(dir<0?"left":"right"):"";
       if(mode!==t.__wzmMoveDir){t.nav=null;t.act=null;t.__wzmMoveDir=mode;}
-      t.pose=AIM?"guard":"";t.act=null;t.t=999;t.blocked=0;
+      t.pose=ATK&&P.atk.kind==="punch"?"shoot":AIM?"guard":"";if(ATK)t.aimY=0;t.act=null;t.t=999;t.blocked=0;
       if(t.nav){n=Vy(t,e);}
       else if(vert){
         const cur=Vg(t.x,t.y);let dest=null,targetX=t.x,best=1e9;
@@ -298,6 +298,7 @@
       }
       if(k.jump&&t.onGround&&!t.sc){t.vy=-205;t.onGround=!1;t.fallY=t.y;t.state="idle";t.lstate="idle";n=0;k.jump=false;}
       if(dir&&!t.sc){t.state="walk";t.lstate="walk";t.t=999;}
+      if(ATK&&!t.sc){n=0;t.vx=0;t.nav=null;t.state="idle";t.lstate="idle";}
       if(AIM&&P.aim.wx!==void 0&&!t.sc)t.dir=P.aim.wx>=t.x?1:-1;
       P.npc===t&&(pL.x+=(t.x-pL.x)*Math.min(1,12*e),pL.y+=(t.y-72-pL.y)*Math.min(1,12*e),pL.vx=0,pL.vy=0,WZMCLAMP());
     }else switch(t.state){case"idle":;`;

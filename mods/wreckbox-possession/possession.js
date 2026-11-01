@@ -12,6 +12,8 @@
     verticalReleaseTimers: { up:null, down:null },
     jumpTimer: null,
     aim: { on:false, wx:0, wy:0 },
+    atk: { kind:null, start:0, until:0, hitDone:true, target:null, last:0 },
+    lmb: false,
     isTyping(e) {
       const t = e && e.target;
       return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable === true);
@@ -79,6 +81,7 @@
     release() {
       if (!this.active) return;
       this.aim.on = false;
+      this.lmb = false; this.atk.until = 0;
       const npc = this.npc;
       this.active = false;
       this.clearKeys();
@@ -323,10 +326,19 @@
     e.preventDefault(); e.stopImmediatePropagation();
     controller.aim.on = true; updateAim(e);
   }, true);
+  // A second mouse button pressed while the first is held arrives as a pointermove (not as pointerdown), so
+  // both the chorded right button (aim) and the chorded left button (attack) are read from "buttons" here.
   window.addEventListener('pointermove', e => {
-    if (!controller.aim.on) return;
-    if (!(e.buttons & 2)) { controller.aim.on = false; return; }
+    if (!controller.active) return;
+    if (!controller.aim.on) {
+      if ((e.buttons & 2) && onCanvas(e)) { controller.aim.on = true; updateAim(e); }
+      else return;
+    }
+    if (!(e.buttons & 2)) { controller.aim.on = false; controller.lmb = false; return; }
     updateAim(e);
+    const left = !!(e.buttons & 1);
+    if (left && !controller.lmb) { controller.lmb = true; if (typeof tryAttack === 'function') tryAttack(); }
+    else if (!left && controller.lmb) controller.lmb = false;
   }, true);
   window.addEventListener('pointerup', e => {
     if (e.button !== 2 || !controller.aim.on) return;
@@ -380,13 +392,114 @@
     for (const r of g.mm) r.__wzmUnseen = false;
     flagged = false;
   };
+
+  // ---------------------------------------------------------------------------------------------------------
+  // Fighting. While aiming (RMB held) the left mouse button hits whatever stands under the ring: a punch knocks a
+  // standing person down (they get up again by themselves, as the game's ragdolls do), a stomp finishes a person who
+  // is lying on the floor and keeps them from getting up. Damage and falling use the game's own functions.
+  // ---------------------------------------------------------------------------------------------------------
+  const ATTACK = {
+    punch: { ms: 260, hitAt: 110, reach: 46, dmg: [6, 11] },
+    stomp: { ms: 380, hitAt: 190, reach: 46, dmg: [9, 15] },
+    cooldown: 150
+  };
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const alive = r => !r.gone && !r.dead && !r.hidden;
+  const bodyPos = r => {
+    if (r.rag && r.rag.x && r.rag.y && r.rag.x.length) {
+      let sx = 0, sy = 0; const n = r.rag.x.length;
+      for (let i = 0; i < n; i++) { sx += r.rag.x[i]; sy += r.rag.y[i]; }
+      return { x: sx / n, y: sy / n };
+    }
+    return { x: r.x, y: r.y - 10 };
+  };
+  // The person the blow is meant for: closest to the aim ring, within reach of the attacker.
+  const pickTarget = q => {
+    const g = window.__WZM_GAME__; if (!g) return null;
+    const v = controller.vision && controller.vision.view, ringX = v && v.ring ? v.ring.x : q.x + q.dir * 24;
+    let best = null, bestD = 1e9;
+    for (const r of g.mm) {
+      if (r === q || !alive(r) || r.sc || r.__wzmUnseen) continue;
+      const p = bodyPos(r), dxQ = p.x - q.x, dyQ = p.y - (q.y - 10);
+      if (Math.abs(dxQ) > ATTACK.punch.reach || Math.abs(dyQ) > 30) continue;
+      const d = Math.abs(p.x - ringX) + Math.abs(dyQ) * 0.5;
+      if (d < bestD) { bestD = d; best = r; }
+    }
+    return best;
+  };
+  const tryAttack = () => {
+    const q = controller.active && controller.npc, now = performance.now(), a = controller.atk;
+    if (!q || q.sc || q.rag || q.dead) return;
+    if (now < a.until + ATTACK.cooldown) return;
+    const target = pickTarget(q);
+    const kind = target && target.rag ? 'stomp' : 'punch';
+    const v = controller.vision && controller.vision.view;
+    if (target) q.dir = bodyPos(target).x >= q.x ? 1 : -1; else if (v && v.ring) q.dir = v.ring.x >= q.x ? 1 : -1;
+    a.kind = kind; a.start = now; a.until = now + ATTACK[kind].ms; a.hitDone = false; a.target = target;
+  };
+  const applyHit = (q, a) => {
+    const g = window.__WZM_GAME__, r = a.target, spec = ATTACK[a.kind];
+    if (!g || !r || !alive(r)) return;
+    const p = bodyPos(r);
+    if (Math.abs(p.x - q.x) > spec.reach + 12) return;                 // moved out of reach meanwhile
+    const dmg = rnd(spec.dmg[0], spec.dmg[1]);
+    if (a.kind === 'punch') {
+      if (g.bx) g.bx(r, dmg, 'blunt');
+      if (g.px && !r.rag && !r.dead) g.px(r, q.dir * rnd(110, 190), -rnd(60, 120), q.dir * rnd(0.6, 1.6));
+    } else {
+      r.noGetUp = true; r.__wzmNoGetUpUntil = performance.now() + 2500; r.downT = 0;
+      if (g.bx) g.bx(r, dmg, 'blunt');
+      if (g.px && r.rag && !r.dead) g.px(r, rnd(-25, 25), -rnd(30, 60), rnd(-1, 1));
+    }
+    r.__wzmVictim = { by: q, at: performance.now(), kind: a.kind };
+    controller.lastHit = r.__wzmVictim;
+  };
+  const combatTick = (g, q, now) => {
+    const a = controller.atk;
+    // people who were being finished may get up again a moment after the last stomp
+    for (const r of g.mm) if (r.__wzmNoGetUpUntil && now > r.__wzmNoGetUpUntil) { r.noGetUp = false; r.__wzmNoGetUpUntil = 0; }
+    if (!q) return;
+    if (a.until > now && !a.hitDone && now - a.start >= ATTACK[a.kind].hitAt) { a.hitDone = true; applyHit(q, a); }
+    if (controller.lmb && controller.aim.on) tryAttack();
+  };
+  // A leg swings out while stomping: the game has no kick pose, so it is drawn on top of the person.
+  const drawKick = (ctx, q, now) => {
+    const a = controller.atk;
+    if (a.kind !== 'stomp' || now >= a.until) return;
+    const p = Math.min(1, (now - a.start) / ATTACK.stomp.ms), s = Math.sin(Math.PI * p);
+    const tp = a.target && a.target.rag ? bodyPos(a.target) : null;
+    const reachX = tp ? Math.max(-ATTACK.stomp.reach, Math.min(ATTACK.stomp.reach, tp.x - q.x)) : q.dir * 16;
+    const hip = { x: q.x + q.dir * 1, y: q.y - 12 };
+    const foot = { x: q.x + (reachX - q.dir * 2) * s + q.dir * 3, y: q.y - 2 - 11 * (1 - Math.abs(2 * p - 1)) };
+    const knee = { x: (hip.x + foot.x) / 2 + q.dir * 4, y: (hip.y + foot.y) / 2 - 2 };
+    const look = q.look || {}, col = typeof look.pants === 'string' ? look.pants : '#2d3340';
+    ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = col; ctx.lineWidth = 3.4;
+    ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.lineTo(knee.x, knee.y); ctx.lineTo(foot.x, foot.y); ctx.stroke();
+    ctx.strokeStyle = '#1b1b1f'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(foot.x, foot.y); ctx.lineTo(foot.x + q.dir * 3.2, foot.y + 0.4); ctx.stroke();
+    ctx.restore();
+  };
+  window.addEventListener('pointerdown', e => {
+    if (!controller.active || e.button !== 0 || !controller.aim.on || !onCanvas(e)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    controller.lmb = true; tryAttack();
+  }, true);
+  window.addEventListener('pointerup', e => {
+    if (e.button !== 0 || !controller.lmb) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    controller.lmb = false;
+  }, true);
+
   controller.vision = { seen: 0, hidden: 0 };
   controller.visionApi = { viewState, canSee, grid, rayLen, opaqueAt };
   window.__wzmDraw = ctx => {
     const g = grid();
     if (!g) return;
     const q = controller.active && controller.npc;
-    if (!q || q.gone || q.dead) { clearFlags(g); return; }
+    if (!q || q.gone || q.dead) { clearFlags(g); combatTick(g, null, performance.now()); return; }
+    const nowMs = performance.now();
+    combatTick(g, q, nowMs);
     const v = viewState(q, g);
     let seen = 0, hid = 0;
     for (const r of g.mm) {
@@ -396,6 +509,7 @@
     }
     flagged = true; controller.vision.seen = seen; controller.vision.hidden = hid;
     controller.vision.view = { ang: v.ang, half: v.half, range: v.range, ring: v.ring };
+    drawKick(ctx, q, nowMs);
     if (!v.aiming) return;
     // --- view cone (only while the right mouse button is held)
     const zoom = g.cam.zoom, N = 72, pts = [];
