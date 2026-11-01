@@ -7,6 +7,22 @@
   const originalEval = window.eval;
   const toolIcon = '<path d="M12 3.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M4.5 20c.6-3.5 3.2-5.3 7.5-5.3s6.9 1.8 7.5 5.3"/><path d="M3 7.5h3M18 7.5h3M12 1v2M12 12v2"/><path d="M2.5 12h3M18.5 12h3"/>';
 
+  // The game's own message function (MR) does not exist yet while the source is being patched, so a
+  // notice about a failed patch has to wait until the game is up. If MR is not reachable from here,
+  // fall back to the game's plain-HTML #toast element.
+  const notifyLater = (message) => {
+    const show = () => {
+      try { if (typeof MR === 'function') { MR(message); return; } } catch (_) {}
+      const toast = document.getElementById('toast');
+      if (!toast) return;
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 7000);
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(show, 1500), { once: true });
+    else setTimeout(show, 1500);
+  };
+
   window.__WRECKBOX_RUN_GAME_SOURCE__ = function (source) {
     if (typeof source !== 'string') return originalEval(source);
     const originalSource = source;
@@ -26,12 +42,33 @@
     replaceOnce('const OL=t=>', 'PL.possession=' + JSON.stringify(toolIcon) + ';const OL=t=>', 'custom icon');
     replaceOnce('function Ny(t,e){const n=t.sc,o=t.nav;if("act"!==t.state)if("stair"===n.type', 'function Ny(t,e){const n=t.sc,o=t.nav;if("act"!==t.state&&!t.__wzmPossessed)if("stair"===n.type', 'possessed door and elevator transitions');
 
+    // Optional patch: a failed marker here only drops this one feature (the rest of the mod still works).
+    const replaceOptional = (needle, replacement, label) => {
+      if (!source.includes(needle)) { console.warn('Possession mod: optional patch skipped, marker missing: ' + label); return false; }
+      source = source.replace(needle, replacement); return true;
+    };
+    // Door transition for a possessed NPC. The game hides the NPC at y=-1e5 for the whole teleport, so the
+    // camera used to fly away and snap back (jerk). Instead a semi-transparent copy of the NPC walks from the
+    // entry door to the exit door in exactly the time the teleport takes, and the camera follows it.
+    // NB: this block sits inside a case block that declares its own `e` later, so it must not use `e`.
+    replaceOptional(
+      'case"door":case"bypass":case"off":{const e="door"===n.type?.35:.6;',
+      'case"door":case"bypass":case"off":{if(t.__wzmPossessed&&"door"===n.type){' +
+        'const wzmRamp=Math.max(.05,Math.min(.35,n.dur/3)),wzmP=Math.min(1,n.t/n.dur);' +
+        't.hidden=!1;t.vx=0;t.dir=n.bx>=n.ax?1:-1;t.ph=n.t*4.2;' +
+        't.x=n.ax+(n.bx-n.ax)*wzmP;t.y=n.ay+(n.by-n.ay)*wzmP;' +
+        't.fade=.42*Math.max(0,Math.min(1,n.t/wzmRamp,(n.dur-n.t)/wzmRamp));' +
+        'if(a>=1){t.x=n.bx;t.y=n.by;t.fade=0;if(!Eg(t.x,t.y)){t.x=n.ax;t.y=n.ay;t.nav=null;t.act=null;}r(1+(n.skip||0));}' +
+        'break;}const e="door"===n.type?.35:.6;',
+      'ghost door transition'
+    );
+
     replaceOnce('function RA(t){if(!OS[t])return;', 'window.__WRECKBOX_SELECT_POSSESSION__=()=>RA("possession");function RA(t){if(!OS[t])return;', 'native tool selector');
 
     const toolMarker = 'BS("camera",{name:r("Камера"),icon:"move",hint:r("Перетаскивайте вид. Колесо или щипок — зум."),mode:"both"});const WS=';
     const toolCode = `BS("possession",{
       name:r("Вселение"),icon:"possession",
-      hint:r("Кликните по человеку. WASD — движение, W/S — лестницы и лифт, Shift — бег, Space — прыжок, E — выход."),
+      hint:r("Кликните по человеку. WASD — движение, W/S — лестницы и лифт, Shift — бег, Space — прыжок, E — дверь, Esc — выход."),
       down(t){
         const P=window.__WRECKBOX_POSSESSION__;
         if(!P)return;
@@ -43,10 +80,11 @@
           if(Math.abs(dx)<28&&Math.abs(dy)<34&&d<dist){best=q;dist=d;}
         }
         if(!best){MR(r("Нажмите прямо на живого человека"),!0);return;}
-        P.camera={x:pL.x,y:pL.y};if(P.enter(best))MR(r("Вы вселились в NPC. Нажмите E для выхода."),!0);
+        P.camera={x:pL.x,y:pL.y};if(P.enter(best))MR(r("Вы вселились в NPC. Esc — выход, E — дверь."),!0);
       },
       update(){
         const P=window.__WRECKBOX_POSSESSION__,panelId="wzm-possession-lift";
+        if(P&&P.dbg){P.dbg.upd++;P.dbg.lastUpd=performance.now();}
         if(!P||!P.active||!P.npc||P.npc.gone||P.npc.dead||P.npc.rag){
           if(P&&P.active&&P.npc&&(!P.npc||P.npc.gone||P.npc.dead||P.npc.rag))P.release();
           const old=document.getElementById(panelId);if(old)old.remove();return;
@@ -72,41 +110,71 @@
         let panel=document.getElementById(panelId);
         if(!lift){if(panel)panel.remove();return;}
         if(!panel){panel=document.createElement("div");panel.id=panelId;
-          panel.style.cssText="position:fixed;z-index:99999;right:24px;bottom:96px;display:flex;flex-direction:column;gap:12px;width:176px;padding:14px;background:rgba(30,31,30,.94);border:1px solid rgba(205,198,178,.28);border-radius:5px;box-shadow:0 5px 18px rgba(0,0,0,.38),inset 0 1px rgba(255,255,255,.05);font:12px Arial,sans-serif;color:#e5e0d4";
+          // "panel" is the game's own frame class; .wzm-lift (see possession.js) adds placement and the hazard stripe.
+          panel.className="panel wzm-lift";panel.setAttribute("role","group");panel.setAttribute("aria-label","Лифт");
           document.body.appendChild(panel);
         }
         if(panel.dataset.elevator!==String(lift.id)||panel.dataset.floor!==String(nearStop)){
           panel.dataset.elevator=String(lift.id);panel.dataset.floor=String(nearStop);panel.replaceChildren();
-          const head=document.createElement("div");head.textContent="ЛИФТ";
-          head.style.cssText="text-align:center;padding:2px 2px 10px;color:#c4bda9;border-bottom:1px solid rgba(205,198,178,.18);font:600 11px Arial;letter-spacing:1.5px;text-transform:uppercase";panel.appendChild(head);
-          const grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(3,1fr);gap:7px";
-          lift.stops.forEach((stop,i)=>{
-            const button=document.createElement("button");button.type="button";button.textContent=String(i+1);button.title="Перейти на этаж "+(i+1);
-            button.style.cssText="height:38px;background:"+(i===nearStop?"#77705f":"rgba(255,255,255,.045)")+";color:"+(i===nearStop?"#fff9e9":"#d8d3c7")+";border:1px solid "+(i===nearStop?"#a69b80":"rgba(205,198,178,.17)")+";border-radius:4px;box-shadow:"+(i===nearStop?"inset 0 1px rgba(255,255,255,.16)":"none")+";font:600 14px Arial;cursor:pointer";
+          // Floors are numbered by height (a larger row is lower on screen), lowest = 1, and drawn top floor first like a real panel.
+          const order=lift.stops.map((s,i)=>i).sort((a,b)=>(lift.stops[b].row||0)-(lift.stops[a].row||0));
+          const floorOf={};order.forEach((idx,n)=>{floorOf[idx]=n+1;});
+          const head=document.createElement("div");head.className="wzm-lift__head";
+          const title=document.createElement("span");title.textContent="Лифт";
+          const here=document.createElement("b");here.textContent=String(floorOf[nearStop]);here.title="Текущий этаж";
+          head.appendChild(title);head.appendChild(here);panel.appendChild(head);
+          const grid=document.createElement("div");grid.className="wzm-lift__grid";
+          order.slice().reverse().forEach(i=>{
+            const current=i===nearStop;
+            const button=document.createElement("button");button.type="button";button.className="wzm-lift__btn";button.textContent=String(floorOf[i]);
+            button.title=current?"Вы на этом этаже":"Перейти на этаж "+floorOf[i];button.setAttribute("aria-label",button.title);
+            if(current){button.setAttribute("aria-current","true");button.disabled=true;}
             button.addEventListener("click",()=>{const C=window.__WRECKBOX_POSSESSION__;if(!C||!C.active||!C.npc)return;const entry=(lift.stops[i].sides||[]).find(v=>v.seg&&!v.seg.dead);if(!entry){try{MR("На этот этаж сейчас нет доступа.");}catch(_){}return;}C.npc.nav=null;C.npc.act=null;if(!Wy(C.npc,entry.seg,entry.x,{run:false,haz:false})){try{MR("Лифт не отвечает.");}catch(_){}}});
             grid.appendChild(button);
           });
-          panel.appendChild(grid);const foot=document.createElement("div");foot.textContent="ВЫБЕРИТЕ ЭТАЖ";foot.style.cssText="text-align:center;color:#9d988b;font:10px Arial;letter-spacing:1.2px";panel.appendChild(foot);
+          panel.appendChild(grid);
+          const foot=document.createElement("div");foot.className="wzm-lift__foot";foot.textContent="Выберите этаж";panel.appendChild(foot);
         }
       },
     });
     window.addEventListener("wzm-possession-door",()=>{
-      const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q)return;
-      let chosen=null,fromA=false,best=54;
-      for(const edge of kg.links){if(edge.dead||edge.type!=="door"||!edge.a||!edge.b)continue;
-        const da=Math.hypot(q.x-edge.ax,q.y-edge.ay),db=Math.hypot(q.x-edge.bx,q.y-edge.by);
-        if(Math.min(da,db)<best){best=Math.min(da,db);chosen=edge;fromA=da<=db;}
+      const P=window.__WRECKBOX_POSSESSION__,q=P&&P.active&&P.npc;if(!q||q.sc)return;
+      // A door link stores one end per node: (ax on node a) and (bx on node b). The game's door links have no
+      // ay/by; the floor height of an end is its node's y. (The old code read edge.ay/edge.by, got NaN, and
+      // never found a door.) The NPC may stand at either end, so both ends are checked.
+      const cur=Vg(q.x,q.y);
+      let chosen=null,fromA=false,best=1e9;
+      for(const edge of kg.links){
+        if(edge.dead||edge.type!=="door"||!edge.a||!edge.b||edge.a.dead||edge.b.dead)continue;
+        const ay=edge.ay!==undefined?edge.ay:edge.a.y,by=edge.by!==undefined?edge.by:edge.b.y;
+        const score=(x,y)=>Math.abs(q.x-x)<64&&Math.abs(q.y-y)<40?Math.abs(q.x-x)+Math.abs(q.y-y)*1.5:1e9;
+        const sa=cur===edge.b?1e9:score(edge.ax,ay),sb=cur===edge.a?1e9:score(edge.bx,by);
+        if(Math.min(sa,sb)<best){best=Math.min(sa,sb);chosen=edge;fromA=sa<=sb;}
       }
       if(!chosen){try{MR("Подойдите вплотную к дверному проёму и нажмите E.");}catch(_){}return;}
-      const target=fromA?chosen.b:chosen.a,x=fromA?chosen.bx:chosen.ax;q.nav=null;q.act=null;
-      if(!Wy(q,target,x,{run:false,haz:false})){try{MR("Не удалось пройти через эту дверь.");}catch(_){}}
+      const from=fromA?chosen.a:chosen.b,to=fromA?chosen.b:chosen.a,x0=fromA?chosen.ax:chosen.bx,x1=fromA?chosen.bx:chosen.ax;
+      // Build the route step by hand so exactly this door is used (a general route search could pick another way).
+      q.act=null;
+      q.nav={steps:[{type:"door",L:chosen,rev:!fromA,from:from,to:to,x0:x0,x:x1}],i:0,sub:0,node:to,x:x1,run:!1,px:q.x,stuck:0,noElev:!0};
     });
     window.addEventListener("wzm-possession-release",()=>{const P=window.__WRECKBOX_POSSESSION__;const panel=document.getElementById("wzm-possession-lift");if(panel)panel.remove();if(P&&P.camera){pL.x=P.camera.x;pL.y=P.camera.y;P.camera=null;}});
+    // Diagnostics (F8 overlay in possession.js): publish NPC and camera values from inside the game scope,
+    // on a timer that does not depend on the game loop or on the tool's update(). Does nothing unless enabled.
+    setInterval(function(){try{
+      const P=window.__WRECKBOX_POSSESSION__;if(!P||!P.debug||!P.dbg)return;
+      const D=P.dbg,q=P.active&&P.npc;if(!q){D.snap=null;D.lossFrom=0;return;}
+      const now=performance.now(),sc=q.sc||null,err=Math.hypot(pL.x-q.x,pL.y-(q.y-72)),warm=now-(D.enterAt||0)<1500;
+      D.snap={x:q.x,y:q.y,state:q.state,sc:sc&&sc.type||"",nav:!!q.nav,ground:!!q.onGround,camX:pL.x,camY:pL.y,err:err};
+      if(warm){D.lossFrom=0;}
+      else if(err>40){if(!D.lossFrom){D.lossFrom=now;D.lossMax=0;D.lossCtx=(sc&&sc.type||"-")+" / "+q.state;}D.lossMax=Math.max(D.lossMax,err);}
+      else if(D.lossFrom){const dur=now-D.lossFrom;D.lossFrom=0;if(dur>300){D.losses.unshift(D.lossCtx+", "+Math.round(dur)+" мс, макс. "+Math.round(D.lossMax)+" px");if(D.losses.length>6)D.losses.pop();}}
+    }catch(_){}},200);
     const WS=`;
     replaceOnce(toolMarker, toolMarker.replace('const WS=', toolCode), 'tool registration');
 
     const movement = `let n=0;if(t.__wzmPossessed){
       const P=window.__WRECKBOX_POSSESSION__,k=P.keys;
+      if(P.dbg){P.dbg.move++;P.dbg.lastMove=performance.now();P.dbg.moveDt=e;}
       if(t.__wzmReleaseAfterSc&&!t.sc){t.__wzmReleaseAfterSc=false;t.__wzmPossessed=false;t.nav=null;t.act=null;t.state="idle";t.lstate="idle";t.t=.2;}
       const dir=(k.right?1:0)-(k.left?1:0),vert=k.up?-1:k.down?1:0;
       const mode=vert?(vert<0?"up":"down"):dir?(dir<0?"left":"right"):"";
@@ -156,7 +224,15 @@
       }else if(dir){
         t.dir=dir;t.state="walk";t.lstate="walk";
         const cur=Vg(t.x,t.y),tx=F(t.x+dir*120,8,m-8),target=Vg(tx,t.y)||Og(tx);
-        if(cur&&target&&cur!==target&&Wy(t,target,tx,{run:!!k.run,haz:!1}))n=Vy(t,e);
+        // Free walking may only follow plain steps. A route from a stair landing or lift stop to the ground (or to
+        // another room) goes over stair/elev/door links; that is what used to drag the NPC back onto the stairs
+        // or into the elevator as soon as it walked out of their range. Such routes are dropped: just walk.
+        let routed=!1;
+        if(cur&&target&&cur!==target&&Wy(t,target,tx,{run:!!k.run,haz:!1})){
+          if(t.nav&&t.nav.steps&&t.nav.steps.every(s=>s.type==="walk"||s.type==="cross"||s.type==="bypass"))routed=!0;
+          else t.nav=null;
+        }
+        if(routed)n=Vy(t,e);
         else n=k.run?t.runSpd:t.spd;
         // The native collision/step-up code below handles each tread of an unlinked staircase.
         if(!t.nav&&!t.sc){const floor=Fg(t.x+dir*7);if(floor>0&&floor<t.y&&t.y-floor<=7&&Eg(t.x+dir*7,floor)&&!sx(t.x+dir*7,floor-27)){t.y=floor;t.fallY=floor;t.onGround=!0;}}
@@ -169,10 +245,13 @@
     }else switch(t.state){case"idle":;`;
     replaceOnce('let n=0;switch(t.state){case"idle":', movement, 'native NPC movement');
 
+    // possession.js shows its fallback toolbar button only when this flag is set.
+    window.__WRECKBOX_POSSESSION_READY__ = true;
     return originalEval(source);
     } catch (error) {
+      window.__WRECKBOX_POSSESSION_READY__ = false;
       console.error('Wreckbox Possession patch failed; starting unmodified game source.', error);
-      try { MR('Мод «Вселение»: версия игры не совпала с патчем. Запущена обычная игра.'); } catch (_) {}
+      notifyLater('Мод «Вселение»: версия игры не совпала с патчем. Запущена обычная игра.');
       return originalEval(originalSource);
     }
   };
