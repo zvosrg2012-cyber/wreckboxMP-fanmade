@@ -11,6 +11,7 @@
     keys: { left:false, right:false, up:false, down:false, run:false, jump:false },
     verticalReleaseTimers: { up:null, down:null },
     jumpTimer: null,
+    aim: { on:false, wx:0, wy:0 },
     isTyping(e) {
       const t = e && e.target;
       return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable === true);
@@ -77,6 +78,7 @@
     },
     release() {
       if (!this.active) return;
+      this.aim.on = false;
       const npc = this.npc;
       this.active = false;
       this.clearKeys();
@@ -259,6 +261,169 @@
   // branch; this overlay only displays them. It exists to find out why the camera stops following the
   // NPC on stairs and in elevators: which transition (sc) is active, how far the camera lags behind,
   // and whether update()/movement keep running during the transition.
+
+  // ---------------------------------------------------------------------------------------------------------
+  // Aiming and vision. Hold the right mouse button: the NPC takes a guard stance, a ring on the floor follows
+  // the cursor and a translucent view cone grows from the head. The vision itself is always on: NPCs outside the
+  // cone, or behind walls, are not drawn (glass and glass blocks do not block the view).
+  // Needs window.__WZM_GAME__ and window.__wzmDraw, which the patch in possession_hook.js provides.
+  // ---------------------------------------------------------------------------------------------------------
+  const GLASS = { 5: true, 17: true };           // material ids "Стекло" and "Стеклоблоки"
+  const VIEW = {
+    walk: { half: 60 * Math.PI / 180, range: 440 },   // normal look: wide and short
+    aim:  { half: 34 * Math.PI / 180, range: 680 }    // aiming: narrow and long, like focusing
+  };
+  const eyeOf = q => ({ x: q.x, y: q.y - 23 });
+  const opaqueAt = (g, x, y) => {
+    const cx = Math.floor(x / 6), cy = Math.floor(y / 6);
+    if (cx < 0 || cx >= g.gw) return true;
+    if (cy < 0) return false;
+    if (cy >= g.rows) return true;
+    const i = cy * g.gw + cx, m = g.gt[i];
+    return m !== 0 && !(g.vt[i] & g.mt) && !GLASS[m];
+  };
+  const solidAt = (g, x, y) => {
+    const cx = Math.floor(x / 6), cy = Math.floor(y / 6);
+    if (cx < 0 || cx >= g.gw) return true;
+    if (cy < 0) return false;
+    if (cy >= g.rows) return true;
+    const i = cy * g.gw + cx;
+    return g.gt[i] !== 0 && !(g.vt[i] & g.mt);
+  };
+  const grid = () => {
+    const g = window.__WZM_GAME__;
+    if (!g || !g.gt || !g.vt || !g.gw) return null;
+    return { gt: g.gt, vt: g.vt, mt: g.mt, gw: g.gw, rows: Math.floor(g.gt.length / g.gw), cam: g.cam, mm: g.mm };
+  };
+  // Length of free sight from (x,y) in direction ang, up to maxLen.
+  const rayLen = (g, x, y, ang, maxLen) => {
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    for (let d = 3; d <= maxLen; d += 3) if (opaqueAt(g, x + dx * d, y + dy * d)) return d - 3;
+    return maxLen;
+  };
+  const clearLine = (g, x0, y0, x1, y1) => {
+    const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy), n = Math.max(1, Math.ceil(len / 3));
+    for (let i = 1; i < n; i++) if (opaqueAt(g, x0 + dx * i / n, y0 + dy * i / n)) return false;
+    return true;
+  };
+  const worldFromClient = (cx, cy) => {
+    const g = window.__WZM_GAME__, cv = document.getElementById('game') || document.querySelector('canvas');
+    if (!g || !g.cam || !cv) return null;
+    const r = cv.getBoundingClientRect();
+    return { x: (cx - r.left - r.width / 2) / g.cam.zoom + g.cam.x, y: (cy - r.top - r.height / 2) / g.cam.zoom + g.cam.y };
+  };
+  const updateAim = e => {
+    controller.aim.cx = e.clientX; controller.aim.cy = e.clientY;
+    const w = worldFromClient(e.clientX, e.clientY);
+    if (w) { controller.aim.wx = w.x; controller.aim.wy = w.y; }
+  };
+  const onCanvas = e => { const t = e.target; return !!t && (t.id === 'game' || t.tagName === 'CANVAS'); };
+  window.addEventListener('pointerdown', e => {
+    if (!controller.active || e.button !== 2 || !onCanvas(e)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    controller.aim.on = true; updateAim(e);
+  }, true);
+  window.addEventListener('pointermove', e => {
+    if (!controller.aim.on) return;
+    if (!(e.buttons & 2)) { controller.aim.on = false; return; }
+    updateAim(e);
+  }, true);
+  window.addEventListener('pointerup', e => {
+    if (e.button !== 2 || !controller.aim.on) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    controller.aim.on = false;
+  }, true);
+  window.addEventListener('contextmenu', e => { if (controller.active) e.preventDefault(); }, true);
+  window.addEventListener('blur', () => { controller.aim.on = false; });
+
+  // Direction of the view: toward the ring while aiming, otherwise the way the NPC faces.
+  const viewState = (q, g) => {
+    const eye = eyeOf(q), aiming = controller.aim.on;
+    const prof = aiming ? VIEW.aim : VIEW.walk;
+    let ang = q.dir >= 0 ? 0 : Math.PI;
+    let ring = null;
+    if (aiming) {
+      const maxR = prof.range - 40;
+      let tx = Math.max(q.x - maxR, Math.min(q.x + maxR, controller.aim.wx));
+      // the ring lies on the floor and stops in front of the first wall
+      const step = tx >= q.x ? 3 : -3;
+      let x = q.x;
+      while (Math.abs(x - tx) > 3 && !solidAt(g, x + step, q.y - 6)) x += step;
+      ring = { x: x, y: q.y };
+      ang = Math.atan2(ring.y - eye.y, ring.x - eye.x);
+      if (Math.abs(ring.x - q.x) < 6) ang = q.dir >= 0 ? 0 : Math.PI;
+    }
+    return { eye, ang, half: prof.half, range: prof.range, ring, aiming };
+  };
+  const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return Math.abs(d); };
+  const posOf = r => {
+    if (r.rag && r.rag.x && r.rag.y && r.rag.x.length) {
+      let sx = 0, sy = 0; const n = r.rag.x.length;
+      for (let i = 0; i < n; i++) { sx += r.rag.x[i]; sy += r.rag.y[i]; }
+      return { x: sx / n, y: sy / n };
+    }
+    return { x: r.x, y: r.y - 12 };
+  };
+  const canSee = (g, v, r) => {
+    const p = posOf(r), tries = r.rag ? [p] : [p, { x: p.x, y: p.y - 10 }, { x: p.x, y: p.y + 8 }];
+    for (const pt of tries) {
+      const dx = pt.x - v.eye.x, dy = pt.y - v.eye.y, d = Math.hypot(dx, dy);
+      if (d > v.range) continue;
+      if (d > 14 && angDiff(Math.atan2(dy, dx), v.ang) > v.half) continue;
+      if (clearLine(g, v.eye.x, v.eye.y, pt.x, pt.y)) return true;
+    }
+    return false;
+  };
+  let flagged = false;
+  const clearFlags = g => {
+    if (!flagged) return;
+    for (const r of g.mm) r.__wzmUnseen = false;
+    flagged = false;
+  };
+  controller.vision = { seen: 0, hidden: 0 };
+  controller.visionApi = { viewState, canSee, grid, rayLen, opaqueAt };
+  window.__wzmDraw = ctx => {
+    const g = grid();
+    if (!g) return;
+    const q = controller.active && controller.npc;
+    if (!q || q.gone || q.dead) { clearFlags(g); return; }
+    const v = viewState(q, g);
+    let seen = 0, hid = 0;
+    for (const r of g.mm) {
+      if (r === q) { r.__wzmUnseen = false; continue; }
+      const ok = canSee(g, v, r);
+      r.__wzmUnseen = !ok; ok ? seen++ : hid++;
+    }
+    flagged = true; controller.vision.seen = seen; controller.vision.hidden = hid;
+    controller.vision.view = { ang: v.ang, half: v.half, range: v.range, ring: v.ring };
+    if (!v.aiming) return;
+    // --- view cone (only while the right mouse button is held)
+    const zoom = g.cam.zoom, N = 72, pts = [];
+    for (let i = 0; i <= N; i++) {
+      const a = v.ang - v.half + (2 * v.half) * i / N;
+      const len = rayLen(g, v.eye.x, v.eye.y, a, v.range);
+      pts.push({ x: v.eye.x + Math.cos(a) * len, y: v.eye.y + Math.sin(a) * len });
+    }
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(v.eye.x, v.eye.y);
+    for (const p of pts) ctx.lineTo(p.x, p.y);
+    ctx.closePath();
+    const grad = ctx.createRadialGradient(v.eye.x, v.eye.y, 8, v.eye.x, v.eye.y, v.range);
+    grad.addColorStop(0, 'rgba(255,246,214,0.42)'); grad.addColorStop(1, 'rgba(255,246,214,0.10)');
+    ctx.fillStyle = grad; ctx.fill();
+    ctx.lineWidth = Math.max(1, 1.4 / zoom); ctx.strokeStyle = 'rgba(255,236,170,0.55)'; ctx.stroke();
+    // --- ring on the floor (a flat ellipse in this side view)
+    if (v.ring) {
+      const k = Math.max(1, 1 / zoom), rx = 15 * k, ry = 5.2 * k;
+      ctx.beginPath(); ctx.ellipse(v.ring.x, v.ring.y + 1, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.fill();
+      ctx.lineWidth = 1.8 * k; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(v.ring.x, v.ring.y + 1, rx * 0.34, ry * 0.34, 0, 0, Math.PI * 2);
+      ctx.lineWidth = 1.4 * k; ctx.strokeStyle = 'rgba(255,205,80,0.95)'; ctx.stroke();
+    }
+    ctx.restore();
+  };
+
   controller.debug = false;
   controller.dbg = { upd:0, move:0, lastUpd:0, lastMove:0, moveDt:0, snap:null, lossFrom:0, lossCtx:'', lossMax:0, losses:[] };
   let debugEl = null, debugPrev = null;

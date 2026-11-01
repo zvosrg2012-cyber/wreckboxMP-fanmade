@@ -55,7 +55,7 @@
     // Injected code is written with the old names (pL, MR); translate it for this build.
     // Read-only window into the game's internals for diagnostics and for automated tests (getters: some of these
     // constants are declared later in the game source than the point where this code runs).
-    const WZ_EXPOSE = 'window.__WZM_GAME__={get mm(){return mm},get kg(){return kg},get cam(){return ' + CAM + '},get IS(){return IS},get Eg(){return Eg},get Fg(){return Fg},get Vg(){return Vg},get ET(){return ET}};';
+    const WZ_EXPOSE = 'window.__WZM_GAME__={get mm(){return mm},get kg(){return kg},get cam(){return ' + CAM + '},get IS(){return IS},get Eg(){return Eg},get Fg(){return Fg},get Vg(){return Vg},get ET(){return ET},get gt(){try{return gt}catch(_){return null}},get vt(){try{return vt}catch(_){return null}},get mt(){try{return mt}catch(_){return 192}},get gw(){try{return u}catch(_){return 0}},get st(){try{return st}catch(_){return null}}};';
     const WZ_HELPERS = 'const WZMSG=(m)=>{try{const n=document.getElementById("toast");if(!n)return;n.textContent=String(m);n.classList.add("show");clearTimeout(window.__wzmToastT);window.__wzmToastT=setTimeout(()=>n.classList.remove("show"),2600);}catch(_){}};' +
       'const WZMCLAMP=()=>{' + (CLAMP ? 'try{' + CLAMP + '()}catch(_){}' : '') + '};';
     const adapt = (code) => code.replace(/\bpL\b/g, CAM).replace(/\bMR\(/g, 'WZMSG(');
@@ -81,6 +81,14 @@
         'break;}const e="door"===n.type?.35:.6;',
       'ghost door transition'
     );
+
+    // Vision: possession.js computes which NPCs the possessed one can see (r.__wzmUnseen) and draws the view cone
+    // and the aim ring through window.__wzmDraw, which is called right after the selected tool's own draw.
+    // Optional patches: without them the rest of the mod works, just without hidden NPCs and the cone.
+    const drawMatch = source.match(/OS\[FS\]\.draw\((\w+),(\w+)\),/);
+    if (drawMatch) replaceOptional(drawMatch[0], drawMatch[0] + 'window.__wzmDraw&&window.__wzmDraw(' + drawMatch[1] + ',' + drawMatch[2] + '),', 'aim/vision draw hook');
+    else console.warn('Possession mod: optional patch skipped, marker missing: aim/vision draw hook');
+    replaceOptional('for(const r of mm){if(r.gone||r.hidden)continue;if(r.fade>.01&&!r.rag)', 'for(const r of mm){if(r.gone||r.hidden||r.__wzmUnseen)continue;if(r.fade>.01&&!r.rag)', 'hide NPCs outside the view cone');
 
     replaceOnce('function RA(t){if(!OS[t])return;', 'window.__WRECKBOX_SELECT_POSSESSION__=()=>RA("possession");function RA(t){if(!OS[t])return;', 'native tool selector');
 
@@ -215,13 +223,13 @@
     replaceOnce(toolMarker, toolMarker.replace('const WS=', WZ_HELPERS + WZ_EXPOSE + adapt(toolCode)), 'tool registration');
 
     const movement = `let n=0;if(t.__wzmPossessed){
-      const P=window.__WRECKBOX_POSSESSION__,k=P.keys;
+      const P=window.__WRECKBOX_POSSESSION__,k=P.keys,AIM=!!(P.aim&&P.aim.on),RUN=!!k.run&&!AIM;
       if(P.dbg){P.dbg.move++;P.dbg.lastMove=performance.now();P.dbg.moveDt=e;}
       if(t.__wzmReleaseAfterSc&&!t.sc){t.__wzmReleaseAfterSc=false;t.__wzmPossessed=false;t.nav=null;t.act=null;t.state="idle";t.lstate="idle";t.t=.2;}
       const dir=(k.right?1:0)-(k.left?1:0),vert=k.up?-1:k.down?1:0;
       const mode=vert?(vert<0?"up":"down"):dir?(dir<0?"left":"right"):"";
       if(mode!==t.__wzmMoveDir){t.nav=null;t.act=null;t.__wzmMoveDir=mode;}
-      t.pose="";t.act=null;t.t=999;t.blocked=0;
+      t.pose=AIM?"guard":"";t.act=null;t.t=999;t.blocked=0;
       if(t.nav){n=Vy(t,e);}
       else if(vert){
         const cur=Vg(t.x,t.y);let dest=null,targetX=t.x,best=1e9;
@@ -241,7 +249,7 @@
             }
           }
         }
-        if(dest&&Wy(t,dest,targetX,{run:!!k.run,haz:!1})){n=Vy(t,e);}
+        if(dest&&Wy(t,dest,targetX,{run:RUN,haz:!1})){n=Vy(t,e);}
         else if(cur){
           // Fallback for player-built stairs that have not entered the AI route graph.
           let ramp=null,rampCost=1e9;
@@ -260,7 +268,7 @@
               if(ok&&changes>=2&&cost<rampCost){ramp={seg,x};rampCost=cost;}
             }
           }
-          if(ramp){const edge={type:"stair",x0:t.x,x:ramp.x,from:cur,to:ramp.seg,L:null};t.nav={steps:[edge],i:0,sub:0,node:ramp.seg,x:ramp.x,run:!!k.run,px:t.x,stuck:0};n=Vy(t,e);}
+          if(ramp){const edge={type:"stair",x0:t.x,x:ramp.x,from:cur,to:ramp.seg,L:null};t.nav={steps:[edge],i:0,sub:0,node:ramp.seg,x:ramp.x,run:RUN,px:t.x,stuck:0};n=Vy(t,e);}
         }
         t.state="walk";t.lstate="walk";t.dir=dir||t.dir;
       }else if(dir){
@@ -277,12 +285,12 @@
         }else t.__wzmEdge=0;
         let routed=!1;
         if(t.nav&&t.nav.steps&&t.nav.steps[0]&&t.nav.steps[0].type==="bypass")routed=!0;
-        if(!routed&&cur&&target&&cur!==target&&Wy(t,target,tx,{run:!!k.run,haz:!1})){
+        if(!routed&&cur&&target&&cur!==target&&Wy(t,target,tx,{run:RUN,haz:!1})){
           if(t.nav&&t.nav.steps&&t.nav.steps.every(s=>s.type==="walk"||s.type==="cross"||s.type==="bypass"))routed=!0;
           else t.nav=null;
         }
         if(routed)n=Vy(t,e);
-        else n=k.run?t.runSpd:t.spd;
+        else n=RUN?t.runSpd:t.spd;
         // The native collision/step-up code below handles each tread of an unlinked staircase.
         if(!t.nav&&!t.sc){const floor=Fg(t.x+dir*7);if(floor>0&&floor<t.y&&t.y-floor<=7&&Eg(t.x+dir*7,floor)&&!sx(t.x+dir*7,floor-27)){t.y=floor;t.fallY=floor;t.onGround=!0;}}
       }else{
@@ -290,6 +298,7 @@
       }
       if(k.jump&&t.onGround&&!t.sc){t.vy=-205;t.onGround=!1;t.fallY=t.y;t.state="idle";t.lstate="idle";n=0;k.jump=false;}
       if(dir&&!t.sc){t.state="walk";t.lstate="walk";t.t=999;}
+      if(AIM&&P.aim.wx!==void 0&&!t.sc)t.dir=P.aim.wx>=t.x?1:-1;
       P.npc===t&&(pL.x+=(t.x-pL.x)*Math.min(1,12*e),pL.y+=(t.y-72-pL.y)*Math.min(1,12*e),pL.vx=0,pL.vy=0,WZMCLAMP());
     }else switch(t.state){case"idle":;`;
     replaceOnce('let n=0;switch(t.state){case"idle":', adapt(movement), 'native NPC movement');
