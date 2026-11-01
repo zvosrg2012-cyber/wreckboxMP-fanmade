@@ -345,9 +345,10 @@
     if (e.button !== 2 || !controller.aim.on) return;
     e.preventDefault(); e.stopImmediatePropagation();
     controller.aim.on = false;
+    controller.lmb = false;
   }, true);
   window.addEventListener('contextmenu', e => { if (controller.active) e.preventDefault(); }, true);
-  window.addEventListener('blur', () => { controller.aim.on = false; });
+  window.addEventListener('blur', () => { controller.aim.on = false; controller.lmb = false; });
 
   // Direction of the view: toward the ring while aiming, otherwise the way the NPC faces.
   const viewState = (q, g) => {
@@ -356,15 +357,13 @@
     let ang = q.dir >= 0 ? 0 : Math.PI;
     let ring = null;
     if (aiming) {
-      const maxR = prof.range - 40;
-      let tx = Math.max(q.x - maxR, Math.min(q.x + maxR, controller.aim.wx));
-      // the ring lies on the floor and stops in front of the first wall
-      const step = tx >= q.x ? 3 : -3;
-      let x = q.x;
-      while (Math.abs(x - tx) > 3 && !solidAt(g, x + step, q.y - 6)) x += step;
-      ring = { x: x, y: q.y };
-      ang = Math.atan2(ring.y - eye.y, ring.x - eye.x);
-      if (Math.abs(ring.x - q.x) < 6) ang = q.dir >= 0 ? 0 : Math.PI;
+      let dx = controller.aim.wx - eye.x, dy = controller.aim.wy - eye.y;
+      let distance = Math.hypot(dx, dy);
+      if (distance < 1) { dx = q.dir >= 0 ? 1 : -1; dy = 0; distance = 1; }
+      ang = Math.atan2(dy, dx);
+      const limit = Math.min(distance, prof.range - 18);
+      const radius = Math.min(limit, rayLen(g, eye.x, eye.y, ang, limit));
+      ring = { x: eye.x + Math.cos(ang) * radius, y: eye.y + Math.sin(ang) * radius };
     }
     return { eye, ang, half: prof.half, range: prof.range, ring, aiming };
   };
@@ -390,7 +389,14 @@
   let flagged = false;
   const clearFlags = g => {
     if (!flagged) return;
-    for (const r of g.mm) r.__wzmUnseen = false;
+    for (const r of g.mm) {
+      r.__wzmUnseen = false;
+      if (r.__wzmVisionFadeBase !== undefined) {
+        r.fade = r.__wzmVisionFadeBase;
+        delete r.__wzmVisionFadeBase;
+      }
+      delete r.__wzmVisionAlpha;
+    }
     flagged = false;
   };
 
@@ -417,13 +423,15 @@
   // The person the blow is meant for: closest to the aim ring, within reach of the attacker.
   const pickTarget = q => {
     const g = window.__WZM_GAME__; if (!g) return null;
-    const v = controller.vision && controller.vision.view, ringX = v && v.ring ? v.ring.x : q.x + q.dir * 24;
-    let best = null, bestD = 1e9;
+    const v = controller.vision && controller.vision.view;
+    const ring = v && v.ring ? v.ring : { x: q.x + q.dir * 24, y: q.y - 10 };
+    let best = null, bestD = 30;
     for (const r of g.mm) {
       if (r === q || !alive(r) || r.sc || r.__wzmUnseen) continue;
       const p = bodyPos(r), dxQ = p.x - q.x, dyQ = p.y - (q.y - 10);
-      if (Math.abs(dxQ) > ATTACK.punch.reach || Math.abs(dyQ) > 30) continue;
-      const d = Math.abs(p.x - ringX) + Math.abs(dyQ) * 0.5;
+      if (Math.hypot(dxQ, dyQ) > ATTACK.punch.reach + 8) continue;
+      if (!clearLine(g, eyeOf(q).x, eyeOf(q).y, p.x, p.y)) continue;
+      const d = Math.hypot(p.x - ring.x, p.y - ring.y);
       if (d < bestD) { bestD = d; best = r; }
     }
     return best;
@@ -442,7 +450,8 @@
     const g = window.__WZM_GAME__, r = a.target, spec = ATTACK[a.kind];
     if (!g || !r || !alive(r)) return;
     const p = bodyPos(r);
-    if (Math.abs(p.x - q.x) > spec.reach + 12) return;                 // moved out of reach meanwhile
+    if (Math.hypot(p.x - q.x, p.y - (q.y - 10)) > spec.reach + 12) return;
+    if (!clearLine(grid(), eyeOf(q).x, eyeOf(q).y, p.x, p.y)) return;
     const dmg = rnd(spec.dmg[0], spec.dmg[1]);
     if (a.kind === 'punch') {
       if (g.bx) g.bx(r, dmg, 'blunt');
@@ -462,24 +471,24 @@
     for (const r of g.mm) if (r.__wzmNoGetUpUntil && now > r.__wzmNoGetUpUntil) { r.noGetUp = false; r.__wzmNoGetUpUntil = 0; }
     if (!q) return;
     if (a.until > now && !a.hitDone && now - a.start >= ATTACK[a.kind].hitAt) { a.hitDone = true; applyHit(q, a); }
-    if (controller.lmb && controller.aim.on) tryAttack();
   };
-  // A leg swings out while stomping: the game has no kick pose, so it is drawn on top of the person.
-  const drawKick = (ctx, q, now) => {
+  // Compact stylized strike overlay; no stretched leg is drawn.
+  const drawStrike = (ctx, q, now) => {
     const a = controller.atk;
-    if (a.kind !== 'stomp' || now >= a.until) return;
-    const p = Math.min(1, (now - a.start) / ATTACK.stomp.ms), s = Math.sin(Math.PI * p);
-    const tp = a.target && a.target.rag ? bodyPos(a.target) : null;
-    const reachX = tp ? Math.max(-ATTACK.stomp.reach, Math.min(ATTACK.stomp.reach, tp.x - q.x)) : q.dir * 16;
-    const hip = { x: q.x + q.dir * 1, y: q.y - 12 };
-    const foot = { x: q.x + (reachX - q.dir * 2) * s + q.dir * 3, y: q.y - 2 - 11 * (1 - Math.abs(2 * p - 1)) };
-    const knee = { x: (hip.x + foot.x) / 2 + q.dir * 4, y: (hip.y + foot.y) / 2 - 2 };
-    const look = q.look || {}, col = typeof look.pants === 'string' ? look.pants : '#2d3340';
+    if (!a.kind || now >= a.until) return;
+    const p = Math.max(0, Math.min(1, (now - a.start) / ATTACK[a.kind].ms));
+    const swing = Math.sin(Math.PI * p);
+    if (swing <= 0.02) return;
+    const dir = q.dir >= 0 ? 1 : -1;
+    const shoulder = { x: q.x + dir * 3, y: q.y - 23 };
+    const elbow = { x: q.x + dir * (5 + 5 * swing), y: q.y - 18 - 2 * swing };
+    const fist = { x: q.x + dir * (10 + 8 * swing), y: q.y - 22 - 2 * swing };
     ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.strokeStyle = col; ctx.lineWidth = 3.4;
-    ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.lineTo(knee.x, knee.y); ctx.lineTo(foot.x, foot.y); ctx.stroke();
-    ctx.strokeStyle = '#1b1b1f'; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.moveTo(foot.x, foot.y); ctx.lineTo(foot.x + q.dir * 3.2, foot.y + 0.4); ctx.stroke();
+    ctx.strokeStyle = '#d8b18a'; ctx.lineWidth = 3.2;
+    ctx.beginPath(); ctx.moveTo(shoulder.x, shoulder.y); ctx.lineTo(elbow.x, elbow.y); ctx.lineTo(fist.x, fist.y); ctx.stroke();
+    ctx.fillStyle = '#e5bd98'; ctx.beginPath(); ctx.arc(fist.x, fist.y, 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,238,190,' + (0.2 + 0.55 * swing) + ')'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(fist.x + dir * 2, fist.y, 5 + 3 * swing, -0.85, 0.85); ctx.stroke();
     ctx.restore();
   };
   window.addEventListener('pointerdown', e => {
@@ -578,17 +587,29 @@
     if (q.dead || q.gone) { toast('Вас убили'); controller.release(); return; }
     const v = viewState(q, g);
     let seen = 0, hid = 0;
+    const fadeStep = Math.min(1, Math.max(0.08, (nowMs - (controller.vision.lastAt || nowMs - 16)) / 150));
+    controller.vision.lastAt = nowMs;
     for (const r of g.mm) {
       if (r === q) { r.__wzmUnseen = false; continue; }
       const ok = canSee(g, v, r);
-      r.__wzmUnseen = !ok; ok ? seen++ : hid++;
+      const previous = typeof r.__wzmVisionAlpha === 'number' ? r.__wzmVisionAlpha : 1;
+      const alpha = previous + ((ok ? 1 : 0) - previous) * fadeStep;
+      r.__wzmVisionAlpha = alpha;
+      r.__wzmUnseen = alpha <= 0.015;
+      if (alpha < 0.999 && !r.rag) {
+        if (r.__wzmVisionFadeBase === undefined) r.__wzmVisionFadeBase = Number(r.fade) || 0;
+        r.fade = Math.max(0.015, alpha * (r.__wzmVisionFadeBase > 0 ? r.__wzmVisionFadeBase : 1));
+      } else if (alpha >= 0.999 && r.__wzmVisionFadeBase !== undefined) {
+        r.fade = r.__wzmVisionFadeBase;
+        delete r.__wzmVisionFadeBase;
+      }
+      ok ? seen++ : hid++;
     }
     flagged = true; controller.vision.seen = seen; controller.vision.hidden = hid;
     controller.vision.view = { ang: v.ang, half: v.half, range: v.range, ring: v.ring };
     drawPolice(ctx, window.__WZM_GAME__, nowMs);
-    drawKick(ctx, q, nowMs);
-    if (!v.aiming) return;
-    // --- view cone (only while the right mouse button is held)
+    drawStrike(ctx, q, nowMs);
+    // --- view cone (always active; aiming mode is brighter and more focused)
     const zoom = g.cam.zoom, N = 72, pts = [];
     for (let i = 0; i <= N; i++) {
       const a = v.ang - v.half + (2 * v.half) * i / N;
@@ -599,18 +620,25 @@
     ctx.beginPath(); ctx.moveTo(v.eye.x, v.eye.y);
     for (const p of pts) ctx.lineTo(p.x, p.y);
     ctx.closePath();
+    const opacity = v.aiming ? 0.22 : 0.11;
     const grad = ctx.createRadialGradient(v.eye.x, v.eye.y, 8, v.eye.x, v.eye.y, v.range);
-    grad.addColorStop(0, 'rgba(255,246,214,0.42)'); grad.addColorStop(1, 'rgba(255,246,214,0.10)');
+    grad.addColorStop(0, 'rgba(255,255,255,' + opacity + ')');
+    grad.addColorStop(1, 'rgba(255,255,255,' + (opacity * 0.28) + ')');
     ctx.fillStyle = grad; ctx.fill();
-    ctx.lineWidth = Math.max(1, 1.4 / zoom); ctx.strokeStyle = 'rgba(255,236,170,0.55)'; ctx.stroke();
-    // --- ring on the floor (a flat ellipse in this side view)
-    if (v.ring) {
-      const k = Math.max(1, 1 / zoom), rx = 15 * k, ry = 5.2 * k;
-      ctx.beginPath(); ctx.ellipse(v.ring.x, v.ring.y + 1, rx, ry, 0, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.fill();
-      ctx.lineWidth = 1.8 * k; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(v.ring.x, v.ring.y + 1, rx * 0.34, ry * 0.34, 0, 0, Math.PI * 2);
-      ctx.lineWidth = 1.4 * k; ctx.strokeStyle = 'rgba(255,205,80,0.95)'; ctx.stroke();
+    ctx.lineWidth = Math.max(1, 1.4 / zoom);
+    ctx.strokeStyle = v.aiming ? 'rgba(255,255,255,0.48)' : 'rgba(255,255,255,0.24)';
+    ctx.stroke();
+    // Free 2D cursor ring with a directional marker.
+    if (v.ring && v.aiming) {
+      const k = Math.max(0.75, 1 / zoom), radius = 8 * k;
+      ctx.beginPath(); ctx.arc(v.ring.x, v.ring.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill();
+      ctx.lineWidth = 1.5 * k; ctx.strokeStyle = 'rgba(255,255,255,0.88)'; ctx.stroke();
+      ctx.save(); ctx.translate(v.ring.x, v.ring.y); ctx.rotate(v.ang);
+      ctx.beginPath(); ctx.moveTo(radius + 2 * k, 0); ctx.lineTo(radius + 6 * k, 0);
+      ctx.moveTo(-radius - 2 * k, 0); ctx.lineTo(-radius - 6 * k, 0);
+      ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 1.4 * k; ctx.stroke();
+      ctx.restore();
     }
     ctx.restore();
   };
