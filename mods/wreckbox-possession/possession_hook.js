@@ -88,7 +88,7 @@
     const drawMatch = source.match(/OS\[FS\]\.draw\((\w+),(\w+)\),/);
     if (drawMatch) replaceOptional(drawMatch[0], drawMatch[0] + 'window.__wzmDraw&&window.__wzmDraw(' + drawMatch[1] + ',' + drawMatch[2] + '),', 'aim/vision draw hook');
     else console.warn('Possession mod: optional patch skipped, marker missing: aim/vision draw hook');
-    replaceOptional('for(const r of mm){if(r.gone||r.hidden)continue;if(r.fade>.01&&!r.rag)', 'for(const r of mm){if(r.gone||r.hidden||r.__wzmUnseen)continue;if(r.fade>.01&&!r.rag)', 'hide NPCs outside the view cone');
+    replaceOptional('for(const r of mm){if(r.gone||r.hidden)continue;if(r.fade>.01&&!r.rag)', 'for(const r of mm){if(r.gone||r.hidden||r.__wzmVisionAlpha<=.015)continue;if(r.fade>.01&&!r.rag)', 'fade NPCs outside the view cone');
 
     replaceOnce('function RA(t){if(!OS[t])return;', 'window.__WRECKBOX_SELECT_POSSESSION__=()=>RA("possession");function RA(t){if(!OS[t])return;', 'native tool selector');
 
@@ -229,7 +229,7 @@
       const dir=(k.right?1:0)-(k.left?1:0),vert=k.up?-1:k.down?1:0;
       const mode=vert?(vert<0?"up":"down"):dir?(dir<0?"left":"right"):"";
       if(mode!==t.__wzmMoveDir){t.nav=null;t.act=null;t.__wzmMoveDir=mode;}
-      t.pose=ATK&&P.atk.kind==="punch"?"shoot":AIM?"guard":"";if(ATK)t.aimY=0;t.act=null;t.t=999;t.blocked=0;
+      t.pose=AIM?"guard":"";if(ATK)t.aimY=0;t.act=null;t.t=999;t.blocked=0;
       if(t.nav){n=Vy(t,e);}
       else if(vert){
         const cur=Vg(t.x,t.y);let dest=null,targetX=t.x,best=1e9;
