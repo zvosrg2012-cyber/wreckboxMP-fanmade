@@ -47,18 +47,18 @@
       if (!source.includes(needle)) { console.warn('Possession mod: optional patch skipped, marker missing: ' + label); return false; }
       source = source.replace(needle, replacement); return true;
     };
-    // Door transition for a possessed NPC. The game hides the NPC at y=-1e5 for the whole teleport, so the
+    // Door and "bypass" (crossing a house to the ground on its other side) transitions of a possessed NPC. The game hides the NPC at y=-1e5 for the whole teleport, so the
     // camera used to fly away and snap back (jerk). Instead a semi-transparent copy of the NPC walks from the
     // entry door to the exit door in exactly the time the teleport takes, and the camera follows it.
     // NB: this block sits inside a case block that declares its own `e` later, so it must not use `e`.
     replaceOptional(
       'case"door":case"bypass":case"off":{const e="door"===n.type?.35:.6;',
-      'case"door":case"bypass":case"off":{if(t.__wzmPossessed&&"door"===n.type){' +
+      'case"door":case"bypass":case"off":{if(t.__wzmPossessed&&("door"===n.type||"bypass"===n.type)){' +
         'const wzmRamp=Math.max(.05,Math.min(.35,n.dur/3)),wzmP=Math.min(1,n.t/n.dur);' +
         't.hidden=!1;t.vx=0;t.dir=n.bx>=n.ax?1:-1;t.ph=n.t*4.2;' +
         't.x=n.ax+(n.bx-n.ax)*wzmP;t.y=n.ay+(n.by-n.ay)*wzmP;' +
         't.fade=.42*Math.max(0,Math.min(1,n.t/wzmRamp,(n.dur-n.t)/wzmRamp));' +
-        'if(a>=1){t.x=n.bx;t.y=n.by;t.fade=0;if(!Eg(t.x,t.y)){t.x=n.ax;t.y=n.ay;t.nav=null;t.act=null;}r(1+(n.skip||0));}' +
+        'if(a>=1){t.x=n.bx;t.y=n.by;if("bypass"===n.type){const wzmY=Fg(t.x);if(wzmY>=0)t.y=wzmY;}t.fade=0;if(!Eg(t.x,t.y)){t.x=n.ax;t.y=n.ay;t.nav=null;t.act=null;}r(1+(n.skip||0));}' +
         'break;}const e="door"===n.type?.35:.6;',
       'ghost door transition'
     );
@@ -151,11 +151,27 @@
         const sa=cur===edge.b?1e9:score(edge.ax,ay),sb=cur===edge.a?1e9:score(edge.bx,by);
         if(Math.min(sa,sb)<best){best=Math.min(sa,sb);chosen=edge;fromA=sa<=sb;}
       }
-      if(!chosen){try{MR("Подойдите вплотную к дверному проёму и нажмите E.");}catch(_){}return;}
-      const from=fromA?chosen.a:chosen.b,to=fromA?chosen.b:chosen.a,x0=fromA?chosen.ax:chosen.bx,x1=fromA?chosen.bx:chosen.ax;
-      // Build the route step by hand so exactly this door is used (a general route search could pick another way).
+      // Ground next to a building: the game's "bypass" link moves a person from the end of this ground zone to the
+      // start of the next one, i.e. to the other side of the house. Same rules as the game (gap of at most 220 columns).
+      let side=null,sideScore=1e9;
+      if(cur&&cur.zone&&kg.zones[cur.id]===cur){
+        for(const d of[-1,1]){
+          const nz=kg.zones[cur.id+d];if(!nz)continue;
+          const o=d>0?cur.c1+1:nz.c1+1,a=d>0?nz.c0-1:cur.c0-1;if(a-o>220)continue;
+          const ex=6*((d>0?cur.c1:cur.c0)+.5),dx=Math.abs(q.x-ex);
+          if(dx<90&&dx<sideScore){sideScore=dx;side={from:cur,to:nz,x0:ex,x:6*((d>0?nz.c0:nz.c1)+.5)};}
+        }
+      }
+      // Prefer a door when one is within reach; otherwise cross to the other side of the house.
+      if(!chosen&&!side){try{MR("Подойдите вплотную к двери или к краю дома и нажмите E.");}catch(_){}return;}
       q.act=null;
-      q.nav={steps:[{type:"door",L:chosen,rev:!fromA,from:from,to:to,x0:x0,x:x1}],i:0,sub:0,node:to,x:x1,run:!1,px:q.x,stuck:0,noElev:!0};
+      if(chosen&&(!side||best<=sideScore)){
+        const from=fromA?chosen.a:chosen.b,to=fromA?chosen.b:chosen.a,x0=fromA?chosen.ax:chosen.bx,x1=fromA?chosen.bx:chosen.ax;
+        // Build the route step by hand so exactly this door is used (a general route search could pick another way).
+        q.nav={steps:[{type:"door",L:chosen,rev:!fromA,from:from,to:to,x0:x0,x:x1}],i:0,sub:0,node:to,x:x1,run:!1,px:q.x,stuck:0,noElev:!0};
+      }else{
+        q.nav={steps:[{type:"bypass",from:side.from,to:side.to,x0:side.x0,x:side.x}],i:0,sub:0,node:side.to,x:side.x,run:!1,px:q.x,stuck:0,noElev:!0};
+      }
     });
     window.addEventListener("wzm-possession-release",()=>{const P=window.__WRECKBOX_POSSESSION__;const panel=document.getElementById("wzm-possession-lift");if(panel)panel.remove();if(P&&P.camera){pL.x=P.camera.x;pL.y=P.camera.y;P.camera=null;}});
     // Diagnostics (F8 overlay in possession.js): publish NPC and camera values from inside the game scope,
