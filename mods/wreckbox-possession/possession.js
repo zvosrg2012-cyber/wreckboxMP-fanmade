@@ -82,6 +82,7 @@
       if (!this.active) return;
       this.aim.on = false;
       this.lmb = false; this.atk.until = 0;
+      if (this.wanted) { this.wanted.called = false; this.wanted.witnesses = 0; }
       const npc = this.npc;
       this.active = false;
       this.clearKeys();
@@ -453,6 +454,7 @@
     }
     r.__wzmVictim = { by: q, at: performance.now(), kind: a.kind };
     controller.lastHit = r.__wzmVictim;
+    collectWitnesses(g, q, r, performance.now());
   };
   const combatTick = (g, q, now) => {
     const a = controller.atk;
@@ -491,6 +493,78 @@
     controller.lmb = false;
   }, true);
 
+
+  // ---------------------------------------------------------------------------------------------------------
+  // Witnesses and police. People who see a blow get out a phone (the game's "phone" pose and a handset icon), and
+  // a few seconds later the game's own emergency system is asked for a police unit at the attacker's position
+  // (sv("police", ...)). When the officers arrive and see the possessed person, they open fire.
+  // ---------------------------------------------------------------------------------------------------------
+  const WITNESS = { range: 460, callMs: 2600, shotMs: 900, shotRange: 560, hitChance: 0.55, dmg: [11, 19] };
+  controller.wanted = { called: false, at: 0, witnesses: 0 };
+  const tracers = [];
+  const eyeAt = r => ({ x: r.x, y: r.y - 23 });
+  const collectWitnesses = (g, q, victim, now) => {
+    const eye = eyeOf(q);
+    for (const r of g.mm) {
+      if (r === q || r === victim || !alive(r) || r.rag || r.sc || r.zomb || r.role === 'crew' || r.__wzmCall) continue;
+      const e = eyeAt(r);
+      if (Math.hypot(q.x - e.x, (q.y - 12) - e.y) > WITNESS.range) continue;
+      if (!clearLine(grid(), e.x, e.y, eye.x, eye.y)) continue;
+      r.__wzmCall = { start: now }; controller.wanted.witnesses++;
+    }
+  };
+  const witnessTick = (g, q, now) => {
+    for (const r of g.mm) {
+      const c = r.__wzmCall; if (!c) continue;
+      if (!alive(r) || r.rag) { r.__wzmCall = null; continue; }
+      if (now - c.start < WITNESS.callMs) {
+        r.act = null; r.nav = null; r.state = 'idle'; r.t = 1; r.vx = 0; r.pose = 'phone';
+        if (q) r.dir = q.x >= r.x ? 1 : -1;
+      } else {
+        r.__wzmCall = null; r.pose = ''; r.t = 0.2;
+        if (!controller.wanted.called && g.sv && q) {
+          controller.wanted.called = true; controller.wanted.at = now;
+          try { g.sv('police', q.x, q.y, 700); } catch (_) {}
+          toast('Свидетель вызвал полицию');
+        }
+      }
+    }
+  };
+  const policeTick = (g, q, now) => {
+    if (!q || !g.XM || !g.XM.units) return;
+    for (const u of g.XM.units) {
+      if (u.kind !== 'police' || !u.crew) continue;
+      for (const c of u.crew) {
+        if (!alive(c) || c.rag || c.sc || c.carry) continue;
+        const e = eyeAt(c), dx = q.x - c.x, dist = Math.hypot(dx, (q.y - 12) - e.y);
+        if (dist > WITNESS.shotRange || Math.abs(q.y - c.y) > 70) continue;
+        if (!clearLine(grid(), e.x, e.y, q.x, q.y - 12)) continue;
+        c.__wzmHunt = now;
+        c.dir = dx >= 0 ? 1 : -1; c.vx = 0; c.act = null; c.nav = null; c.state = 'idle'; c.t = 1; c.pose = 'shoot'; c.aimY = 0;
+        if (!c.__wzmShot || now - c.__wzmShot > WITNESS.shotMs) {
+          c.__wzmShot = now;
+          const hit = Math.random() < WITNESS.hitChance;
+          tracers.push({ x0: c.x + c.dir * 9, y0: c.y - 17, x1: q.x + (hit ? 0 : (Math.random() - 0.5) * 30), y1: q.y - 12 + (hit ? 0 : (Math.random() - 0.5) * 18), until: now + 90 });
+          if (hit && g.bx) g.bx(q, rnd(WITNESS.dmg[0], WITNESS.dmg[1]), 'bullet');
+        }
+      }
+    }
+  };
+  const drawPolice = (ctx, g, now) => {
+    for (let i = tracers.length - 1; i >= 0; i--) if (tracers[i].until < now) tracers.splice(i, 1);
+    ctx.save(); ctx.lineCap = 'round';
+    for (const t of tracers) {
+      ctx.strokeStyle = 'rgba(255,232,150,0.95)'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(t.x0, t.y0); ctx.lineTo(t.x1, t.y1); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,245,200,0.95)'; ctx.beginPath(); ctx.arc(t.x0, t.y0, 2.4, 0, Math.PI * 2); ctx.fill();
+    }
+    // handset above everyone who is calling
+    ctx.font = 'bold 12px system-ui,sans-serif'; ctx.textAlign = 'center';
+    for (const r of g.mm) if (r.__wzmCall && !r.__wzmUnseen) { ctx.fillStyle = '#fff'; ctx.fillText('☎', r.x, r.y - 34 - 2 * Math.sin(now / 160)); }
+    ctx.restore();
+  };
+  const toast = msg => { try { const n = document.getElementById('toast'); if (!n) return; n.textContent = msg; n.classList.add('show'); setTimeout(() => n.classList.remove('show'), 2800); } catch (_) {} };
+
   controller.vision = { seen: 0, hidden: 0 };
   controller.visionApi = { viewState, canSee, grid, rayLen, opaqueAt };
   window.__wzmDraw = ctx => {
@@ -500,6 +574,8 @@
     if (!q || q.gone || q.dead) { clearFlags(g); combatTick(g, null, performance.now()); return; }
     const nowMs = performance.now();
     combatTick(g, q, nowMs);
+    const GM = window.__WZM_GAME__; witnessTick(GM, q, nowMs); policeTick(GM, q, nowMs);
+    if (q.dead || q.gone) { toast('Вас убили'); controller.release(); return; }
     const v = viewState(q, g);
     let seen = 0, hid = 0;
     for (const r of g.mm) {
@@ -509,6 +585,7 @@
     }
     flagged = true; controller.vision.seen = seen; controller.vision.hidden = hid;
     controller.vision.view = { ang: v.ang, half: v.half, range: v.range, ring: v.ring };
+    drawPolice(ctx, window.__WZM_GAME__, nowMs);
     drawKick(ctx, q, nowMs);
     if (!v.aiming) return;
     // --- view cone (only while the right mouse button is held)
