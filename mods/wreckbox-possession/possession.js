@@ -350,23 +350,26 @@
   window.addEventListener('blur', () => { controller.aim.on = false; });
 
   // Direction of the view: toward the ring while aiming, otherwise the way the NPC faces.
+  const sm = { ang: 0, half: VIEW.walk.half, range: VIEW.walk.range, last: 0, k: 0, ok: false };
   const viewState = (q, g) => {
     const eye = eyeOf(q), aiming = controller.aim.on;
-    const prof = aiming ? VIEW.aim : VIEW.walk;
-    let ang = q.dir >= 0 ? 0 : Math.PI;
-    let ring = null;
+    const now = performance.now(), dt = sm.last ? Math.min(0.1, (now - sm.last) / 1000) : 0.016; sm.last = now;
+    let target = q.dir >= 0 ? 0 : Math.PI, ring = null;
     if (aiming) {
-      const maxR = prof.range - 40;
-      let tx = Math.max(q.x - maxR, Math.min(q.x + maxR, controller.aim.wx));
-      // the ring lies on the floor and stops in front of the first wall
-      const step = tx >= q.x ? 3 : -3;
-      let x = q.x;
-      while (Math.abs(x - tx) > 3 && !solidAt(g, x + step, q.y - 6)) x += step;
-      ring = { x: x, y: q.y };
-      ang = Math.atan2(ring.y - eye.y, ring.x - eye.x);
-      if (Math.abs(ring.x - q.x) < 6) ang = q.dir >= 0 ? 0 : Math.PI;
+      const dx = controller.aim.wx - eye.x, dy = controller.aim.wy - eye.y, d = Math.hypot(dx, dy);
+      if (d > 8) {
+        const a = Math.atan2(dy, dx), len = Math.min(d, VIEW.aim.range - 40);
+        const free = rayLen(g, eye.x, eye.y, a, len);          // the ring stops in front of the first wall
+        ring = { x: eye.x + Math.cos(a) * free, y: eye.y + Math.sin(a) * free, free: free < len - 1 };
+        target = a;
+      }
     }
-    return { eye, ang, half: prof.half, range: prof.range, ring, aiming };
+    const prof = aiming ? VIEW.aim : VIEW.walk, f = 1 - Math.exp(-dt * 16);
+    if (!sm.ok) { sm.ang = target; sm.ok = true; }
+    let da = target - sm.ang; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+    sm.ang += da * f; sm.half += (prof.half - sm.half) * f; sm.range += (prof.range - sm.range) * f;
+    sm.k += ((aiming ? 1 : 0) - sm.k) * (1 - Math.exp(-dt * 10));
+    return { eye, ang: sm.ang, half: sm.half, range: sm.range, ring, aiming, k: sm.k, dt };
   };
   const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return Math.abs(d); };
   const posOf = r => {
@@ -390,7 +393,7 @@
   let flagged = false;
   const clearFlags = g => {
     if (!flagged) return;
-    for (const r of g.mm) r.__wzmUnseen = false;
+    for (const r of g.mm) { r.__wzmUnseen = false; r.__wzmVis = undefined; }
     flagged = false;
   };
 
@@ -400,8 +403,8 @@
   // is lying on the floor and keeps them from getting up. Damage and falling use the game's own functions.
   // ---------------------------------------------------------------------------------------------------------
   const ATTACK = {
-    punch: { ms: 260, hitAt: 110, reach: 46, dmg: [6, 11] },
-    stomp: { ms: 380, hitAt: 190, reach: 46, dmg: [9, 15] },
+    punch: { ms: 300, hitAt: 130, reach: 34, dmg: [6, 11] },
+    stomp: { ms: 420, hitAt: 210, reach: 42, dmg: [9, 15] },
     cooldown: 150
   };
   const rnd = (a, b) => a + Math.random() * (b - a);
@@ -422,7 +425,7 @@
     for (const r of g.mm) {
       if (r === q || !alive(r) || r.sc || r.__wzmUnseen) continue;
       const p = bodyPos(r), dxQ = p.x - q.x, dyQ = p.y - (q.y - 10);
-      if (Math.abs(dxQ) > ATTACK.punch.reach || Math.abs(dyQ) > 30) continue;
+      if (Math.abs(dxQ) > (r.rag ? ATTACK.stomp.reach : ATTACK.punch.reach) || Math.abs(dyQ) > 30) continue;
       const d = Math.abs(p.x - ringX) + Math.abs(dyQ) * 0.5;
       if (d < bestD) { bestD = d; best = r; }
     }
@@ -436,7 +439,7 @@
     const kind = target && target.rag ? 'stomp' : 'punch';
     const v = controller.vision && controller.vision.view;
     if (target) q.dir = bodyPos(target).x >= q.x ? 1 : -1; else if (v && v.ring) q.dir = v.ring.x >= q.x ? 1 : -1;
-    a.kind = kind; a.start = now; a.until = now + ATTACK[kind].ms; a.hitDone = false; a.target = target;
+    a.side = kind === 'punch' ? !a.side : a.side; a.kind = kind; a.start = now; a.until = now + ATTACK[kind].ms; a.hitDone = false; a.target = target;
   };
   const applyHit = (q, a) => {
     const g = window.__WZM_GAME__, r = a.target, spec = ATTACK[a.kind];
@@ -461,25 +464,57 @@
     // people who were being finished may get up again a moment after the last stomp
     for (const r of g.mm) if (r.__wzmNoGetUpUntil && now > r.__wzmNoGetUpUntil) { r.noGetUp = false; r.__wzmNoGetUpUntil = 0; }
     if (!q) return;
+    if (a.kind === 'stomp' && a.until > now && a.target && alive(a.target)) {      // step up to the person on the floor
+      const gap = bodyPos(a.target).x - q.x - q.dir * 12;
+      if (Math.abs(gap) > 1.5) q.x += Math.sign(gap) * Math.min(Math.abs(gap), 1.6);
+    }
     if (a.until > now && !a.hitDone && now - a.start >= ATTACK[a.kind].hitAt) { a.hitDone = true; applyHit(q, a); }
     if (controller.lmb && controller.aim.on) tryAttack();
   };
-  // A leg swings out while stomping: the game has no kick pose, so it is drawn on top of the person.
+  // The game has no punch or kick pose, so the moving limb is drawn on top of the person (two-bone arm / leg).
+  const ease = x => x * x * (3 - 2 * x), lerp = (a, b, k) => a + (b - a) * k;
+  const limb = (ctx, a, b, l1, l2, bend, w, col) => {
+    let dx = b.x - a.x, dy = b.y - a.y, d = Math.min(Math.hypot(dx, dy) || 0.01, l1 + l2 - 0.2);
+    const ux = dx / (Math.hypot(dx, dy) || 1), uy = dy / (Math.hypot(dx, dy) || 1);
+    const s = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - s * s));
+    const k1 = { x: a.x + ux * s - uy * h, y: a.y + uy * s + ux * h }, k2 = { x: a.x + ux * s + uy * h, y: a.y + uy * s - ux * h };
+    const kn = (k1.x * bend + k1.y * 0.0 > k2.x * bend) ? k1 : k2;                     // knee/elbow bends toward `bend`
+    const end = { x: a.x + ux * d, y: a.y + uy * d };
+    ctx.strokeStyle = col; ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(kn.x, kn.y); ctx.lineTo(end.x, end.y); ctx.stroke();
+    return end;
+  };
   const drawKick = (ctx, q, now) => {
     const a = controller.atk;
-    if (a.kind !== 'stomp' || now >= a.until) return;
-    const p = Math.min(1, (now - a.start) / ATTACK.stomp.ms), s = Math.sin(Math.PI * p);
-    const tp = a.target && a.target.rag ? bodyPos(a.target) : null;
-    const reachX = tp ? Math.max(-ATTACK.stomp.reach, Math.min(ATTACK.stomp.reach, tp.x - q.x)) : q.dir * 16;
-    const hip = { x: q.x + q.dir * 1, y: q.y - 12 };
-    const foot = { x: q.x + (reachX - q.dir * 2) * s + q.dir * 3, y: q.y - 2 - 11 * (1 - Math.abs(2 * p - 1)) };
-    const knee = { x: (hip.x + foot.x) / 2 + q.dir * 4, y: (hip.y + foot.y) / 2 - 2 };
-    const look = q.look || {}, col = typeof look.pants === 'string' ? look.pants : '#2d3340';
+    if (!a.kind || now >= a.until) return;
+    const p = Math.min(1, (now - a.start) / ATTACK[a.kind].ms), dir = q.dir >= 0 ? 1 : -1, look = q.look || {};
     ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.strokeStyle = col; ctx.lineWidth = 3.4;
-    ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.lineTo(knee.x, knee.y); ctx.lineTo(foot.x, foot.y); ctx.stroke();
-    ctx.strokeStyle = '#1b1b1f'; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.moveTo(foot.x, foot.y); ctx.lineTo(foot.x + q.dir * 3.2, foot.y + 0.4); ctx.stroke();
+    if (a.kind === 'punch') {
+      const skin = typeof look.skin === 'string' ? look.skin : '#e2b48c', sleeve = typeof look.top === 'string' ? look.top : '#3c4660';
+      const sh = { x: q.x + dir * 1, y: q.y - 19 + (a.side ? 1 : 0) };
+      let fx, fy;
+      if (p < 0.38) { const e = ease(p / 0.38); fx = lerp(5, -3, e); fy = lerp(-5, -2, e) - (a.side ? 1 : 0); }          // wind up: fist back
+      else if (p < 0.62) { const e = ease((p - 0.38) / 0.24); fx = lerp(-3, 19, e); fy = lerp(-2, -4, e); }              // snap forward
+      else { const e = ease((p - 0.62) / 0.38); fx = lerp(19, 5, e); fy = lerp(-4, -5, e); }                              // pull back
+      const fist = { x: sh.x + dir * fx, y: sh.y + fy + 2 };
+      if (p >= 0.34 && p < 0.7) {                                                                                          // speed streak
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(fist.x - dir * 9, fist.y - 2); ctx.lineTo(fist.x - dir * 2, fist.y - 2); ctx.moveTo(fist.x - dir * 8, fist.y + 2); ctx.lineTo(fist.x - dir * 1, fist.y + 2); ctx.stroke();
+      }
+      const end = limb(ctx, sh, fist, 7.5, 7.5, dir, 3.6, sleeve);
+      ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(end.x + dir * 0.6, end.y, 2.5, 0, Math.PI * 2); ctx.fill();
+    } else {
+      const col = typeof look.pants === 'string' ? look.pants : '#2d3340';
+      const hip = { x: q.x + dir * 1, y: q.y - 12 }, gx = q.x;
+      let fx, fy;
+      if (p < 0.42) { const e = ease(p / 0.42); fx = lerp(2, 7, e); fy = lerp(-1, -9, e); }                               // knee up
+      else if (p < 0.62) { const e = ease((p - 0.42) / 0.2); fx = lerp(7, 12, e); fy = lerp(-9, -0.5, e); }               // stomp down
+      else { const e = ease((p - 0.62) / 0.38); fx = lerp(12, 2, e); fy = lerp(-0.5, -1, e); }                            // back
+      const foot = { x: gx + dir * fx, y: q.y + fy };
+      const end = limb(ctx, hip, foot, 6.8, 6.8, dir, 3.8, col);
+      ctx.strokeStyle = '#1b1b1f'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(end.x, end.y); ctx.lineTo(end.x + dir * 3.4, end.y + 0.3); ctx.stroke();
+    }
     ctx.restore();
   };
   window.addEventListener('pointerdown', e => {
@@ -579,17 +614,20 @@
     const v = viewState(q, g);
     let seen = 0, hid = 0;
     for (const r of g.mm) {
-      if (r === q) { r.__wzmUnseen = false; continue; }
+      if (r === q) { r.__wzmUnseen = false; r.__wzmVis = undefined; continue; }
       const ok = canSee(g, v, r);
       r.__wzmUnseen = !ok; ok ? seen++ : hid++;
+      // people fade out slowly when they leave the view and fade in quickly when they enter it
+      let c = r.__wzmVis === undefined ? (ok ? 1 : 0) : r.__wzmVis;
+      c = ok ? Math.min(1, c + v.dt / 0.16) : Math.max(0, c - v.dt / 0.55);
+      r.__wzmVis = c;
     }
     flagged = true; controller.vision.seen = seen; controller.vision.hidden = hid;
     controller.vision.view = { ang: v.ang, half: v.half, range: v.range, ring: v.ring };
     drawPolice(ctx, window.__WZM_GAME__, nowMs);
     drawKick(ctx, q, nowMs);
-    if (!v.aiming) return;
-    // --- view cone (only while the right mouse button is held)
-    const zoom = g.cam.zoom, N = 72, pts = [];
+    // --- view cone: always on, pale and faint while walking, brighter while aiming
+    const zoom = g.cam.zoom, N = 72, pts = [], k = v.k, tt = nowMs / 1000;
     for (let i = 0; i <= N; i++) {
       const a = v.ang - v.half + (2 * v.half) * i / N;
       const len = rayLen(g, v.eye.x, v.eye.y, a, v.range);
@@ -599,18 +637,30 @@
     ctx.beginPath(); ctx.moveTo(v.eye.x, v.eye.y);
     for (const p of pts) ctx.lineTo(p.x, p.y);
     ctx.closePath();
-    const grad = ctx.createRadialGradient(v.eye.x, v.eye.y, 8, v.eye.x, v.eye.y, v.range);
-    grad.addColorStop(0, 'rgba(255,246,214,0.42)'); grad.addColorStop(1, 'rgba(255,246,214,0.10)');
+    const grad = ctx.createRadialGradient(v.eye.x, v.eye.y, 6, v.eye.x, v.eye.y, v.range);
+    grad.addColorStop(0, 'rgba(255,255,255,' + lerp(0.15, 0.34, k).toFixed(3) + ')');
+    grad.addColorStop(0.6, 'rgba(255,255,255,' + lerp(0.06, 0.15, k).toFixed(3) + ')');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = grad; ctx.fill();
-    ctx.lineWidth = Math.max(1, 1.4 / zoom); ctx.strokeStyle = 'rgba(255,236,170,0.55)'; ctx.stroke();
-    // --- ring on the floor (a flat ellipse in this side view)
-    if (v.ring) {
-      const k = Math.max(1, 1 / zoom), rx = 15 * k, ry = 5.2 * k;
-      ctx.beginPath(); ctx.ellipse(v.ring.x, v.ring.y + 1, rx, ry, 0, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.fill();
-      ctx.lineWidth = 1.8 * k; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(v.ring.x, v.ring.y + 1, rx * 0.34, ry * 0.34, 0, 0, Math.PI * 2);
-      ctx.lineWidth = 1.4 * k; ctx.strokeStyle = 'rgba(255,205,80,0.95)'; ctx.stroke();
+    ctx.lineWidth = Math.max(0.8, 1.2 / zoom); ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,' + lerp(0.10, 0.45, k).toFixed(3) + ')'; ctx.stroke();
+    // --- aim ring: a round reticle that sits exactly where the cursor points (not tied to the floor)
+    if (v.ring && k > 0.05) {
+      const s = Math.max(1, 0.9 / zoom), R = 12 * s, x = v.ring.x, y = v.ring.y, pul = 1 + 0.06 * Math.sin(tt * 6);
+      ctx.globalAlpha = Math.min(1, k * 1.2);
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, R * 1.5);
+      glow.addColorStop(0, 'rgba(255,255,255,0.20)'); glow.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y, R * 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.92)'; ctx.lineWidth = 1.5 * s;
+      ctx.beginPath(); ctx.arc(x, y, R * pul, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = v.ring.free ? 'rgba(255,150,120,0.95)' : 'rgba(255,214,110,0.95)'; ctx.lineWidth = 2.2 * s;
+      ctx.setLineDash([R * 0.7, R * 0.55]); ctx.lineDashOffset = -tt * R * 2.2;
+      ctx.beginPath(); ctx.arc(x, y, R * 0.66, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.3 * s;
+      ctx.beginPath();
+      for (let n = 0; n < 4; n++) { const a = n * Math.PI / 2 + Math.PI / 4; ctx.moveTo(x + Math.cos(a) * R * 1.12, y + Math.sin(a) * R * 1.12); ctx.lineTo(x + Math.cos(a) * R * 1.5, y + Math.sin(a) * R * 1.5); }
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.beginPath(); ctx.arc(x, y, 1.6 * s, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
   };
@@ -661,4 +711,14 @@
   }, true);
   setInterval(renderDebug, 250);
 
+})();
+
+// Map editor lives in its own file next to this one; load it without touching the installer.
+(() => {
+  try {
+    const me = document.currentScript && document.currentScript.src;
+    const s = document.createElement('script');
+    s.src = me ? me.replace(/possession\.js(\?.*)?$/, 'mapeditor.js') : './mods/wreckbox-possession/mapeditor.js';
+    document.head.appendChild(s);
+  } catch (_) {}
 })();

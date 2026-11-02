@@ -55,7 +55,7 @@
     // Injected code is written with the old names (pL, MR); translate it for this build.
     // Read-only window into the game's internals for diagnostics and for automated tests (getters: some of these
     // constants are declared later in the game source than the point where this code runs).
-    const WZ_EXPOSE = 'window.__WZM_GAME__={get mm(){return mm},get kg(){return kg},get cam(){return ' + CAM + '},get IS(){return IS},get Eg(){return Eg},get Fg(){return Fg},get Vg(){return Vg},get ET(){return ET},get gt(){try{return gt}catch(_){return null}},get vt(){try{return vt}catch(_){return null}},get mt(){try{return mt}catch(_){return 192}},get gw(){try{return u}catch(_){return 0}},get st(){try{return st}catch(_){return null}},get px(){try{return px}catch(_){return null}},get bx(){try{return bx}catch(_){return null}},get XM(){try{return XM}catch(_){return null}},get sv(){try{return sv}catch(_){return null}},get Wy(){try{return Wy}catch(_){return null}}};';
+    const WZ_EXPOSE = 'window.__WZM_GAME__={get mm(){return mm},get kg(){return kg},get cam(){return ' + CAM + '},get IS(){return IS},get Eg(){return Eg},get Fg(){return Fg},get Vg(){return Vg},get ET(){return ET},get gt(){try{return gt}catch(_){return null}},get vt(){try{return vt}catch(_){return null}},get mt(){try{return mt}catch(_){return 192}},get gw(){try{return u}catch(_){return 0}},get st(){try{return st}catch(_){return null}},get px(){try{return px}catch(_){return null}},get bx(){try{return bx}catch(_){return null}},get XM(){try{return XM}catch(_){return null}},get sv(){try{return sv}catch(_){return null}},get Wy(){try{return Wy}catch(_){return null}},get Gz(){try{return Gz}catch(_){return null}},get Dz(){try{return Dz}catch(_){return null}},get Bz(){try{return Bz}catch(_){return null}},get Fz(){try{return Fz}catch(_){return null}},get qz(){try{return qz}catch(_){return null}},get qf(){try{return qf}catch(_){return null}},get ie(){try{return ie}catch(_){return null}},get ce(){try{return ce}catch(_){return null}},get se(){try{return se}catch(_){return null}},get In(){try{return In}catch(_){return null}},get ne(){try{return ne}catch(_){return null}},get St(){try{return St}catch(_){return null}},get Mt(){try{return Mt}catch(_){return null}},get yt(){try{return yt}catch(_){return null}},get Lt(){try{return Lt}catch(_){return null}},get Rt(){try{return Rt}catch(_){return null}},get Ec(){try{return Ec}catch(_){return null}},get wA(){try{return wA}catch(_){return null}},get wc(){try{return wc}catch(_){return null}},get GC(){try{return GC}catch(_){return null}},get WC(){try{return WC}catch(_){return null}},get Xa(){try{return Xa}catch(_){return null}},get BC(){try{return BC}catch(_){return null}},get ox(){try{return ox}catch(_){return null}},get xA(){try{return xA}catch(_){return null}},get eh(){try{return eh}catch(_){return null}},get nh(){try{return nh}catch(_){return null}},get jf(){try{return jf}catch(_){return null}},get OL(){try{return OL}catch(_){return null}},setOL(v){try{OL=!!v}catch(_){}},setGA(v){try{gA=v}catch(_){}}};';
     const WZ_HELPERS = 'const WZMSG=(m)=>{try{const n=document.getElementById("toast");if(!n)return;n.textContent=String(m);n.classList.add("show");clearTimeout(window.__wzmToastT);window.__wzmToastT=setTimeout(()=>n.classList.remove("show"),2600);}catch(_){}};' +
       'const WZMCLAMP=()=>{' + (CLAMP ? 'try{' + CLAMP + '()}catch(_){}' : '') + '};';
     const adapt = (code) => code.replace(/\bpL\b/g, CAM).replace(/\bMR\(/g, 'WZMSG(');
@@ -88,7 +88,8 @@
     const drawMatch = source.match(/OS\[FS\]\.draw\((\w+),(\w+)\),/);
     if (drawMatch) replaceOptional(drawMatch[0], drawMatch[0] + 'window.__wzmDraw&&window.__wzmDraw(' + drawMatch[1] + ',' + drawMatch[2] + '),', 'aim/vision draw hook');
     else console.warn('Possession mod: optional patch skipped, marker missing: aim/vision draw hook');
-    replaceOptional('for(const r of mm){if(r.gone||r.hidden)continue;if(r.fade>.01&&!r.rag)', 'for(const r of mm){if(r.gone||r.hidden||r.__wzmUnseen)continue;if(r.fade>.01&&!r.rag)', 'hide NPCs outside the view cone');
+    replaceOptional('(s||i)&&t.translate(-i,-s)}t.lineCap="butt"', '(s||i)&&t.translate(-i,-s)}t.globalAlpha=1,t.lineCap="butt"', 'reset alpha after NPC fade');
+    replaceOptional('for(const r of mm){if(r.gone||r.hidden)continue;if(r.fade>.01&&!r.rag)', 'for(const r of mm){if(r.gone||r.hidden||r.__wzmVis<.02)continue;t.globalAlpha=r.__wzmVis===void 0?1:r.__wzmVis;if(r.fade>.01&&!r.rag)', 'hide NPCs outside the view cone');
 
     replaceOnce('function RA(t){if(!OS[t])return;', 'window.__WRECKBOX_SELECT_POSSESSION__=()=>RA("possession");function RA(t){if(!OS[t])return;', 'native tool selector');
 
@@ -229,7 +230,7 @@
       const dir=(k.right?1:0)-(k.left?1:0),vert=k.up?-1:k.down?1:0;
       const mode=vert?(vert<0?"up":"down"):dir?(dir<0?"left":"right"):"";
       if(mode!==t.__wzmMoveDir){t.nav=null;t.act=null;t.__wzmMoveDir=mode;}
-      t.pose=ATK&&P.atk.kind==="punch"?"shoot":AIM?"guard":"";if(ATK)t.aimY=0;t.act=null;t.t=999;t.blocked=0;
+      t.pose=ATK||AIM?"guard":"";if(ATK)t.aimY=0;t.act=null;t.t=999;t.blocked=0;
       if(t.nav){n=Vy(t,e);}
       else if(vert){
         const cur=Vg(t.x,t.y);let dest=null,targetX=t.x,best=1e9;
