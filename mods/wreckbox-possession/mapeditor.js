@@ -41,7 +41,6 @@
   };
 
   // ------------------------------------------------------------------ palette -------------------------------
-  const BG_NAMES = { 1: 'Задняя стена', 10: 'Фон 10', 11: 'Фон 11', 12: 'Фон 12', 13: 'Фон 13', 14: 'Фон 14', 15: 'Фон 15', 17: 'Фон 17', 18: 'Фон 18' };
   const rgb = c => Array.isArray(c) ? 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')' : '#888';
   const buildPalette = () => {
     const g = G(), out = [], used = new Set();
@@ -55,12 +54,9 @@
     }
     return out;
   };
-  const buildBgs = () => Object.keys(BG_NAMES).map(k => ({ kind: 'bg', name: BG_NAMES[k], bg: +k }));
-  const PROP_CATS = { furniture: 'Мебель и быт', explosive: 'Взрывоопасное', other: 'Прочее' };
-
   // ------------------------------------------------------------------ state ---------------------------------
   const S = { tool: 'pencil', size: 2, filled: true, sel: null, tab: 'mat', drawing: false, a: null, b: null, stroke: null, last: null,
-              undo: [], redo: [], cur: { id: null, name: 'Без названия', thumb: '' }, pal: [], bgs: [], propKey: null, search: '' };
+              undo: [], redo: [], cur: { id: null, name: 'Без названия', thumb: '' }, pal: [], bgOf: {}, propKey: null, search: '' };
   const canvas = () => document.getElementById('game') || document.querySelector('canvas');
   const world = e => {
     const g = G(), cv = canvas(), r = cv.getBoundingClientRect(), z = g.cam.zoom;
@@ -173,7 +169,7 @@
   const pick = c => {
     const g = G(); if (!inb(c.cx, c.cy)) return; const i = c.cy * g.gw + c.cx;
     if (g.gt[i]) { const m = S.pal.find(p => p.m === g.gt[i] && p.t === (g.Mt[i] || 0)) || S.pal.find(p => p.m === g.gt[i]); if (m) { setSel(m); S.tab = 'mat'; renderTabs(); } }
-    else if (g.St[i]) { const b = S.bgs.find(p => p.bg === g.St[i]); if (b) { setSel(b); S.tab = 'bg'; renderTabs(); } }
+    else if (g.St[i]) { const b = S.pal.find(p => p.m === g.St[i] && p.t === 0); if (b) { S.tab = 'bg'; setSel(S.bgOf[b.m] || (S.bgOf[b.m] = { kind: 'bg', name: b.name, bg: b.m })); } }
     S.tool = 'pencil'; renderTools();
   };
   const blocking = e => ED.active && e.button === 0 && onCanvas(e);
@@ -231,15 +227,30 @@
   };
 
   // ------------------------------------------------------------------ world operations ----------------------------
-  const wipe = () => {
-    const g = G(), gw = g.gw; let n = 0;
-    for (let x = 0; x < gw; x++) {
-      const top = g.Rt ? g.Rt[x] : 0;
-      for (let y = 0; y < top; y++) { const i = y * gw + x; if (g.gt[i]) { g.ce(i); n++; } if (g.St[i]) { g.St[i] = 0; } g.Lt[i] = -1; g.se(i); }
+  // A flat map: every column becomes a copy of one plain terrain column taken from the current world; everything
+  // above ground, all props and all people are removed.
+  const flatten = () => {
+    const g = G(), gw = g.gw, R = rows(), TERRAIN = { 8: 1, 9: 1, 11: 1, 13: 1 };
+    let tx = -1;
+    for (let d = 0; d < gw / 2 && tx < 0; d++) for (const x of [(gw >> 1) + d, (gw >> 1) - d]) {
+      if (x < 0 || x >= gw) continue; let ok = true;
+      for (let y = g.Rt[x]; y < R && ok; y++) { const v = g.gt[y * gw + x]; if (v && !TERRAIN[v]) ok = false; }
+      if (ok) { tx = x; break; }
     }
+    if (tx < 0) tx = gw >> 1;
+    const T = g.Rt[tx], col = [];
+    for (let y = 0; y < R; y++) col.push(snap(y * gw + tx));
     for (const o of (g.Xa || []).slice()) if (o && o.pt && !o.dead) { try { g.GC(o); } catch (_) {} }
     for (const r of (g.mm || []).slice()) if (!r.gone) { try { g.WC(r); } catch (_) {} }
-    S.undo.length = 0; S.redo.length = 0; return n;
+    for (let x = 0; x < gw; x++) {
+      if (x !== tx) for (let y = 0; y < R; y++) {
+        const i = y * gw + x, want = y < T ? [0, 0, 0, 0, col[0][4]] : col[y];
+        if (g.gt[i] === want[0] && g.St[i] === want[4] && g.Mt[i] === want[2] && g.vt[i] === want[3]) continue;
+        restore(i, want);
+      }
+      g.Rt[x] = T;
+    }
+    S.undo.length = 0; S.redo.length = 0; return T;
   };
   const thumbNow = () => {
     try {
@@ -288,134 +299,196 @@
     refreshCards(); say('Карта «' + (name || 'из файла') + '» добавлена в выбор карт'); return true;
   };
 
-  // ------------------------------------------------------------------ UI ------------------------------------------
+  // ------------------------------------------------------------------ UI (built from the game's own classes) --
   const CSS = `
-  .wzed{position:fixed;z-index:60;font:600 13px/1.2 var(--font-body,system-ui,sans-serif);color:#f3efe4;user-select:none}
+  .wzed{position:fixed;z-index:60;color:var(--ink,#f3f0e7);font:600 13px/1.2 var(--font-body,system-ui,sans-serif);user-select:none}
   .wzed *{box-sizing:border-box}
-  .wzed-left{left:8px;top:108px;bottom:8px;width:268px;display:flex;flex-direction:column;background:rgba(22,24,29,.93);border:1px solid rgba(255,194,26,.35);border-radius:10px;overflow:hidden}
-  .wzed-top{left:50%;top:108px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100vw - 600px);background:rgba(22,24,29,.93);border:1px solid rgba(255,194,26,.35);border-radius:10px;padding:6px}
-  .wzed-file{right:8px;top:108px;width:196px;display:flex;flex-direction:column;gap:6px;background:rgba(22,24,29,.93);border:1px solid rgba(255,194,26,.35);border-radius:10px;padding:8px}
-  .wzed button,.wzed-btn{font:inherit;color:#f3efe4;background:#2a2e36;border:1px solid #444a56;border-radius:7px;padding:6px 9px;cursor:pointer}
-  .wzed button:hover{border-color:rgba(255,194,26,.7)}
-  .wzed button.on{background:var(--accent,#ffc21a);color:#1a1a1a;border-color:var(--accent,#ffc21a)}
-  .wzed button.acc{background:#3a3220;border-color:rgba(255,194,26,.6)}
-  .wzed-tabs{display:flex;gap:4px;padding:6px;border-bottom:1px solid #33383f}
-  .wzed-tabs button{flex:1;padding:6px 2px;font-size:12px}
-  .wzed-body{flex:1;overflow:auto;padding:6px}
-  .wzed-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}
-  .wzed-grid button{display:flex;align-items:center;gap:6px;text-align:left;padding:5px 6px;font-size:12px;min-height:32px}
-  .wzed-sw{width:18px;height:18px;border-radius:4px;border:1px solid rgba(255,255,255,.35);flex:none}
-  .wzed-h{margin:8px 2px 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#ffc21a}
-  .wzed input[type=text],.wzed input[type=search]{width:100%;padding:6px 8px;border-radius:7px;border:1px solid #444a56;background:#14161a;color:#f3efe4;font:inherit}
-  .wzed label{display:flex;align-items:center;gap:6px;font-size:12px}
-  .wzed-info{font-size:11px;color:#b9b4a6;font-weight:500;padding:2px}
-  .wzed-toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);z-index:70;background:rgba(22,24,29,.96);border:1px solid rgba(255,194,26,.5);color:#f3efe4;padding:8px 14px;border-radius:9px;font:600 13px system-ui;opacity:0;pointer-events:none;transition:opacity .2s}
+  .wzed.panel{padding:6px}
+  .wzed-pal{left:8px;top:64px;bottom:96px;width:312px;display:flex;flex-direction:column;gap:6px}
+  .wzed-tabs{display:flex;flex-wrap:wrap;gap:4px}
+  .wzed-tabs .chip{height:30px;padding:0 10px;cursor:pointer;font:700 11px/1 var(--font-display,system-ui);letter-spacing:.05em;text-transform:uppercase;color:inherit}
+  .wzed-body{flex:1;overflow:auto;padding:2px;scrollbar-width:thin}
+  .wzed-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+  .wzed-tile{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 3px 5px;min-height:74px;background:var(--panel-hi,rgba(255,255,255,.07));border:1px solid transparent;border-radius:2px;color:inherit;font:inherit;cursor:pointer}
+  .wzed-tile:hover{background:var(--panel-hi2,rgba(255,255,255,.14))}
+  .wzed-tile.on{border-color:var(--accent,#ffc21a);background:rgba(255,194,26,.14)}
+  .wzed-tile canvas,.wzed-tile .ico{width:44px;height:44px;image-rendering:pixelated;flex:none}
+  .wzed-tile .ico svg{width:34px;height:34px;margin:5px}
+  .wzed-tile span{font-size:10.5px;line-height:1.1;text-align:center;color:var(--ink-dim,#a9aaa6);word-break:break-word}
+  .wzed-tile.on span{color:var(--ink,#f3f0e7)}
+  .wzed-h{margin:8px 2px 5px;font:700 11px/1 var(--font-display,system-ui);letter-spacing:.1em;text-transform:uppercase;color:var(--accent,#ffc21a)}
+  .wzed input[type=search]{width:100%;height:34px;padding:0 10px;border-radius:2px;border:1px solid var(--line,rgba(255,255,255,.1));background:rgba(0,0,0,.35);color:inherit;font:inherit}
+  .wzed-info{font-size:11px;line-height:1.35;color:var(--ink-dim,#a9aaa6);font-weight:500;padding:4px 2px}
+  .wzed-bar{left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:4px;align-items:stretch;max-width:calc(100vw - 16px);overflow-x:auto}
+  .wzed-bar .sep{width:1px;background:var(--line,rgba(255,255,255,.12));margin:4px 4px}
+  .wzed-size{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:92px;padding:0 6px}
+  .wzed-size div{display:flex;gap:4px;align-items:center}
+  .wzed-size b{min-width:22px;text-align:center;font:700 15px var(--font-display,system-ui)}
+  .wzed-size small{font-size:9.5px;color:var(--ink-dim,#a9aaa6)}
+  .wzed-top{right:8px;top:8px;display:flex;gap:6px;align-items:center}
+  .wzed-name{left:8px;top:8px;display:flex;align-items:center;gap:8px;height:48px;padding:0 14px!important;font:700 13px var(--font-display,system-ui);letter-spacing:.06em;text-transform:uppercase}
+  .wzed-name small{color:var(--ink-dim,#a9aaa6);font-weight:600;letter-spacing:.02em;text-transform:none}
+  .wzed-menu{right:8px;top:66px;width:230px;display:flex;flex-direction:column;gap:3px}
+  .wzed-menu button{display:flex;align-items:center;gap:8px;height:36px;padding:0 10px;background:var(--panel-hi,rgba(255,255,255,.07));border:1px solid transparent;border-radius:2px;color:inherit;font:600 13px var(--font-body,system-ui);text-align:left;cursor:pointer}
+  .wzed-menu button:hover{border-color:var(--accent,#ffc21a)}
+  .wzed-menu hr{border:0;border-top:1px solid var(--line,rgba(255,255,255,.12));margin:3px 0;width:100%}
+  .wzed-toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:90;background:rgba(16,18,22,.97);border:1px solid var(--accent,#ffc21a);color:var(--ink,#f3f0e7);padding:9px 16px;font:600 13px system-ui;opacity:0;pointer-events:none;transition:opacity .2s}
   .wzed-toast.on{opacity:1}
-  body.wzed-on #hudBottom,body.wzed-on #tools,body.wzed-on #mDestroy,body.wzed-on #mBuild{display:none!important}
-  .wzed-modal{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center}
-  .wzed-modal>div{width:min(560px,92vw);max-height:80vh;overflow:auto;background:#1c1f25;border:1px solid rgba(255,194,26,.4);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
-  .wzed-row{display:flex;gap:8px;align-items:center;background:#252932;border-radius:8px;padding:6px}
-  .wzed-row img{width:96px;height:54px;object-fit:cover;border-radius:5px;background:#111}
-  .wzed-row b{flex:1}
-  .mapCard.wzm-custom .x{position:absolute;right:6px;top:6px;background:rgba(0,0,0,.6);color:#fff;border-radius:5px;padding:1px 6px;font-size:12px}
+  body.wzed-on #hudTop,body.wzed-on #hudBottom,body.wzed-on #hudShow,body.wzed-on #tgCard{display:none!important}
+  .wzed-modal{position:fixed;inset:0;z-index:95;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center}
+  .wzed-modal>div{width:min(580px,92vw);max-height:80vh;overflow:auto;display:flex;flex-direction:column;gap:8px;color:var(--ink,#f3f0e7)}
+  .wzed-row{display:flex;gap:8px;align-items:center;background:var(--panel-hi,rgba(255,255,255,.07));padding:6px}
+  .wzed-row img{width:96px;height:54px;object-fit:cover;background:#111;flex:none}
+  .wzed-row b{flex:1;font:700 13px var(--font-display,system-ui);letter-spacing:.04em;text-transform:uppercase}
   .mapCard.wzm-custom{position:relative}
-  .mapCard.wzm-custom img{width:100%;height:100%;object-fit:cover;display:block;border-radius:4px}
+  .mapCard.wzm-custom .x{position:absolute;right:6px;top:6px;background:rgba(0,0,0,.65);color:#fff;padding:1px 7px;font-size:12px}
+  .mapCard.wzm-custom img{width:100%;height:100%;object-fit:cover;display:block}
   `;
   let ui = null;
-  const setSel = s => { S.sel = s; if (S.tool === 'eraser' || S.tool === 'pick' || S.tool === 'prop' || S.tool === 'person' || S.tool === 'delete') S.tool = 'pencil'; renderTools(); renderTabs(); };
+  const svg = p => '<svg class="i" viewBox="0 0 24 24" aria-hidden="true">' + p + '</svg>';
+  const PATH = {
+    line: '<path d="M4 20L20 4"/><circle cx="4" cy="20" r="1.7"/><circle cx="20" cy="4" r="1.7"/>',
+    rect: '<rect x="4" y="6" width="16" height="12" rx="1"/>',
+    fill: '<path d="M5 12l6-7 8 8-7 6z"/><path d="M19 16c1.2 1.6 2 2.7 2 3.6a2 2 0 0 1-4 0c0-.9.8-2 2-3.6z"/>',
+    pick: '<path d="M17 3l4 4-3 3-4-4z"/><path d="M14 8L5 17v3h3l9-9"/>',
+    trash: '<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/>',
+    play: '<path d="M7 4l13 8-13 8z"/>', exit: '<path d="M9 4H5v16h4M15 8l4 4-4 4M19 12H9"/>', save: '<path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/>',
+    folder: '<path d="M3 7h6l2 2h10v10H3z"/>', down: '<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>', up: '<path d="M12 16V5M7 9l5-5 5 5M5 20h14"/>',
+    cam: '<path d="M4 8h4l2-3h4l2 3h4v11H4z"/><circle cx="12" cy="13" r="3.4"/>', flat: '<path d="M3 16h18M3 20h18M7 12V8l5-3 5 3v4"/>'
+  };
+  const icon = (name, fallback) => { const z = G().zL; return svg((z && z[name]) || PATH[name] || PATH[fallback] || ''); };
+  const setSel = s => { S.sel = s; S.propKey = null; if (!['pencil', 'line', 'rect', 'fill'].includes(S.tool)) S.tool = 'pencil'; renderTools(); renderTabs(); };
   const setTool = t => { S.tool = t; renderTools(); renderTabs(); };
   const setSize = n => { S.size = Math.max(1, Math.min(12, n)); if (ui) ui.size.textContent = S.size; };
-  const TOOLS = [['pencil', 'Кисть (B)'], ['line', 'Линия (L)'], ['rect', 'Прямоугольник (R)'], ['fill', 'Заливка (G)'], ['eraser', 'Ластик (E)'], ['pick', 'Пипетка (I)'], ['delete', 'Удалить предмет/человека']];
-  const renderTools = () => { if (!ui) return; for (const b of ui.top.querySelectorAll('[data-tool]')) b.classList.toggle('on', b.dataset.tool === S.tool); };
+  const TOOLS = [['pencil', 'Кисть', 'brush'], ['line', 'Линия', 'line'], ['rect', 'Прямоуг.', 'rect'], ['fill', 'Заливка', 'fill'], ['eraser', 'Ластик', 'eraser'], ['pick', 'Пипетка', 'pick'], ['delete', 'Удалить', 'trash']];
+  const TIPS = { pencil: 'Кисть (B)', line: 'Линия (L)', rect: 'Прямоугольник (R)', fill: 'Заливка (G)', eraser: 'Ластик (E)', pick: 'Пипетка (I)', delete: 'Удалить предмет или человека' };
+  const renderTools = () => { if (!ui) return; for (const b of ui.bar.querySelectorAll('[data-tool]')) b.classList.toggle('on', b.dataset.tool === S.tool || (b.dataset.tool === 'pencil' && (S.tool === 'prop' || S.tool === 'person'))); };
+
+  // pixel-art swatch for a material (dimmed for the background layer)
+  const matIcon = (m, bg) => {
+    const c = document.createElement('canvas'); c.width = c.height = 40; const x = c.getContext('2d'), base = (G().st[m.m] || {}).base || [128, 128, 128];
+    let s = m.m * 7919 + 13; const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const col = k => 'rgb(' + base.map(v => Math.max(0, Math.min(255, Math.round(v * k)))).join(',') + ')';
+    for (let cy = 0; cy < 8; cy++) for (let cx = 0; cx < 8; cx++) { x.fillStyle = col(0.88 + rnd() * 0.24); x.fillRect(cx * 5, cy * 5, 5, 5); }
+    if (m.m === 2) { x.fillStyle = col(0.55); for (let r = 0; r < 4; r++) { x.fillRect(0, r * 10 + 9, 40, 1); for (let k = (r % 2) * 10 + 5; k < 40; k += 20) x.fillRect(k, r * 10, 1, 10); } }
+    else if (m.m === 1) { x.fillStyle = col(0.7); for (let r = 4; r < 40; r += 8) x.fillRect(0, r, 40, 1); x.fillStyle = col(1.25); x.fillRect(0, 12, 40, 1); }
+    else if (m.m === 5 || m.m === 17) { x.fillStyle = 'rgba(255,255,255,.55)'; x.fillRect(6, 30, 3, 3); x.fillRect(10, 24, 3, 3); x.fillRect(14, 18, 3, 3); x.fillRect(18, 12, 3, 3); if (m.m === 17) { x.fillStyle = col(0.6); x.fillRect(19, 0, 2, 40); x.fillRect(0, 19, 40, 2); } }
+    else if (m.m === 4 || m.m === 18 || m.m === 19) { x.fillStyle = col(1.35); for (const [px, py] of [[3, 3], [35, 3], [3, 35], [35, 35]]) x.fillRect(px, py, 3, 3); x.fillStyle = col(0.6); x.fillRect(0, 19, 40, 2); }
+    else if (m.m === 7) { x.fillStyle = 'rgba(30,20,10,.65)'; for (let k = 4; k < 40; k += 9) x.fillRect(k, 0, 2, 40); for (let r = 4; r < 40; r += 9) x.fillRect(0, r, 40, 2); }
+    else if (m.m === 10 || m.m === 16) { x.fillStyle = col(0.6); for (let r = 0; r < 4; r++) x.fillRect(0, r * 10 + 9, 40, 1); }
+    else if (m.m === 12) { x.fillStyle = 'rgba(255,230,120,.55)'; for (let k = 0; k < 6; k++) x.fillRect((k * 13) % 36, (k * 17) % 36, 5, 5); }
+    x.strokeStyle = 'rgba(0,0,0,.55)'; x.lineWidth = 2; x.strokeRect(1, 1, 38, 38);
+    if (bg) { x.fillStyle = 'rgba(8,10,16,.5)'; x.fillRect(0, 0, 40, 40); x.strokeStyle = 'rgba(255,255,255,.18)'; x.lineWidth = 1; x.strokeRect(4.5, 4.5, 31, 31); }
+    return c;
+  };
+  const propIcon = k => {
+    const d = document.createElement('canvas'); d.width = d.height = 44; const x = d.getContext('2d');
+    try { const sp = G().zc(k, 0, 0), s = Math.min(40 / sp.width, 40 / sp.height); x.imageSmoothingEnabled = false; x.drawImage(sp, (44 - sp.width * s) / 2, (44 - sp.height * s) / 2, sp.width * s, sp.height * s); } catch (_) {}
+    return d;
+  };
+  const tile = (iconEl, label, on, fn, title) => {
+    const b = el('button', 'wzed-tile' + (on ? ' on' : '')); b.type = 'button'; if (title) b.title = title;
+    if (typeof iconEl === 'string') { const w = el('div', 'ico'); w.innerHTML = iconEl; b.appendChild(w); } else b.appendChild(iconEl);
+    b.appendChild(el('span', null, label)); b.onclick = fn; return b;
+  };
+  const TABS = [['mat', 'Материалы'], ['bg', 'Фон'], ['furniture', 'Мебель'], ['explosive', 'Взрывчатка'], ['other', 'Прочее'], ['ppl', 'Люди']];
   const renderTabs = () => {
     if (!ui) return;
     for (const b of ui.tabs.children) b.classList.toggle('on', b.dataset.tab === S.tab);
-    const body = ui.body; body.textContent = '';
-    const item = (label, color, on, fn) => { const b = el('button'); if (color) { const s = el('span', 'wzed-sw'); s.style.background = color; b.appendChild(s); } b.appendChild(document.createTextNode(label)); if (on) b.classList.add('on'); b.onclick = fn; return b; };
-    if (S.tab === 'mat') {
-      const gr = el('div', 'wzed-grid');
-      for (const m of S.pal) gr.appendChild(item(m.name, m.color, S.sel === m, () => { S.sel = m; if (!['pencil', 'line', 'rect', 'fill'].includes(S.tool)) S.tool = 'pencil'; renderTools(); renderTabs(); }));
-      body.append(el('div', 'wzed-h', 'Все материалы игры (' + S.pal.length + ')'), gr);
-    } else if (S.tab === 'bg') {
-      const gr = el('div', 'wzed-grid');
-      for (const b of S.bgs) gr.appendChild(item(b.name, null, S.sel === b, () => { S.sel = b; if (!['pencil', 'line', 'rect', 'fill'].includes(S.tool)) S.tool = 'pencil'; renderTools(); renderTabs(); }));
-      body.append(el('div', 'wzed-h', 'Фоновые слои'), gr, el('div', 'wzed-info', 'Фон рисуется за материалами и не держит конструкции. Ластик убирает материал, а если его нет — фон.'));
-    } else if (S.tab === 'prop') {
-      const g = G(), inp = el('input'); inp.type = 'search'; inp.placeholder = 'Поиск предметов…'; inp.value = S.search;
-      const list = el('div'); body.append(inp, list);
-      const fill = () => {
-        list.textContent = ''; const q = S.search.toLowerCase(), cats = {};
-        for (const k of Object.keys(g.wc || {})) { const d = g.wc[k]; const nm = d.name || k; if (q && !(nm.toLowerCase().includes(q) || k.includes(q))) continue; (cats[d.cat || 'other'] = cats[d.cat || 'other'] || []).push([k, nm]); }
-        for (const c of Object.keys(cats)) {
-          const gr = el('div', 'wzed-grid'); list.append(el('div', 'wzed-h', (PROP_CATS[c] || c) + ' (' + cats[c].length + ')'), gr);
-          for (const [k, nm] of cats[c]) gr.appendChild(item(nm, null, S.propKey === k && S.tool === 'prop', () => { S.propKey = k; S.tool = 'prop'; renderTools(); fill(); }));
-        }
-      };
-      inp.oninput = () => { S.search = inp.value; fill(); }; fill();
+    const body = ui.body, g = G(), keep = body.scrollTop; body.textContent = '';
+    if (S.tab === 'mat' || S.tab === 'bg') {
+      const bg = S.tab === 'bg', gr = el('div', 'wzed-grid');
+      const list = bg ? S.pal.filter(m => m.m <= 17 && m.t === 0) : S.pal;
+      for (const m of list) {
+        const target = bg ? (S.bgOf[m.m] || (S.bgOf[m.m] = { kind: 'bg', name: m.name, bg: m.m })) : m;
+        gr.appendChild(tile(matIcon(m, bg), m.name, S.sel === target, () => setSel(target)));
+      }
+      body.append(el('div', 'wzed-h', bg ? 'Фон — слой за стеной' : 'Материалы (' + S.pal.length + ')'), gr,
+        el('div', 'wzed-info', bg ? 'Фон не держит конструкции и рисуется за основным материалом. Ластик убирает материал, а если его нет — фон.' : 'Здесь все материалы игры, а не только те, что есть в штатном меню.'));
+    } else if (S.tab === 'ppl') {
+      body.append(el('div', 'wzed-h', 'Люди'), tile(icon('person'), 'Житель', S.tool === 'person', () => { S.tool = 'person'; renderTools(); renderTabs(); }),
+        el('div', 'wzed-info', 'Клик по карте — появится человек. Убрать его можно инструментом «Удалить».'));
     } else {
-      const b = item('Поставить человека', null, S.tool === 'person', () => { S.tool = 'person'; renderTools(); renderTabs(); });
-      body.append(el('div', 'wzed-h', 'Люди'), b, el('div', 'wzed-info', 'Клик по карте — появится житель. Удалить — инструмент «Удалить».'));
+      const q = S.search.toLowerCase(), gr = el('div', 'wzed-grid'); let n = 0;
+      for (const k of Object.keys(g.wc || {})) {
+        const d = g.wc[k], nm = d.name || k; if ((d.cat || 'other') !== S.tab) continue; if (q && !(nm.toLowerCase().includes(q) || k.includes(q))) continue;
+        gr.appendChild(tile(propIcon(k), nm, S.propKey === k && S.tool === 'prop', () => { S.propKey = k; S.tool = 'prop'; renderTools(); renderTabs(); }, nm)); n++;
+      }
+      body.append(el('div', 'wzed-h', (TABS.find(t => t[0] === S.tab) || [])[1] + ' (' + n + ')'), gr);
     }
+    body.scrollTop = keep;
   };
-  const renderFile = () => {
-    if (!ui) return; ui.fileName.textContent = S.cur.name + (S.cur.id ? '' : ' (не сохранена)');
-  };
+  const renderFile = () => { if (ui) ui.fileName.textContent = S.cur.name + (S.cur.id ? '' : ' · не сохранена'); };
   const openList = async () => {
-    const recs = await dbAll(), m = el('div', 'wzed-modal'), box = el('div'); m.appendChild(box);
+    const recs = await dbAll(), m = el('div', 'wzed-modal'), box = el('div', 'panel'); m.appendChild(box);
     box.appendChild(el('div', 'wzed-h', 'Мои карты'));
-    if (!recs.length) box.appendChild(el('div', 'wzed-info', 'Пока ничего нет. Нажмите «Сохранить».'));
+    if (!recs.length) box.appendChild(el('div', 'wzed-info', 'Пока ничего нет. Сохраните карту — она появится здесь и в выборе карт.'));
+    const mkb = (cls, html, title, fn) => { const b = el('button', cls); b.type = 'button'; b.title = title; b.innerHTML = html; b.onclick = fn; return b; };
     for (const r of recs) {
       const row = el('div', 'wzed-row'), im = el('img'); if (r.thumb) im.src = r.thumb;
-      const nm = el('b', null, r.name), open = el('button', 'acc', 'Открыть'), dl = el('button', null, '⬇ .wbx'), rm = el('button', null, '✕');
-      open.onclick = async () => { m.remove(); await loadBytes(r.data, r); }; dl.onclick = () => download(r);
-      rm.onclick = async () => { if (confirm('Удалить карту «' + r.name + '»?')) { await dbDel(r.id); refreshCards(); m.remove(); openList(); } };
-      row.append(im, nm, open, dl, rm); box.appendChild(row);
+      row.append(im, el('b', null, r.name),
+        mkb('ib wide', icon('folder') + 'Открыть', 'Открыть в редакторе', async () => { m.remove(); await loadBytes(r.data, r); }),
+        mkb('ib', icon('down'), 'Скачать .wbx', () => download(r)),
+        mkb('ib', icon('trash'), 'Удалить', async () => { if (confirm('Удалить карту «' + r.name + '»?')) { await dbDel(r.id); refreshCards(); m.remove(); openList(); } }));
+      box.appendChild(row);
     }
-    const close = el('button', null, 'Закрыть'); close.onclick = () => m.remove(); box.appendChild(close);
+    box.appendChild(mkb('ib wide', 'Закрыть', '', () => m.remove()));
     m.onclick = e => { if (e.target === m) m.remove(); }; document.body.appendChild(m);
   };
-  const buildUi = () => {
-    const st = el('style'); st.textContent = CSS; document.head.appendChild(st);
-    const left = el('div', 'wzed wzed-left'), tabs = el('div', 'wzed-tabs'), body = el('div', 'wzed-body');
-    for (const [k, n] of [['mat', 'Материалы'], ['bg', 'Фон'], ['prop', 'Предметы'], ['ppl', 'Люди']]) { const b = el('button', null, n); b.dataset.tab = k; b.onclick = () => { S.tab = k; renderTabs(); }; tabs.appendChild(b); }
-    left.append(tabs, body);
-    const top = el('div', 'wzed wzed-top');
-    for (const [k, n] of TOOLS) { const b = el('button', null, n.replace(/ \(.\)$/, '')); b.title = n; b.dataset.tool = k; b.onclick = () => setTool(k); top.appendChild(b); }
-    const sz = el('span', null, ''), minus = el('button', null, '−'), plus = el('button', null, '+'), size = el('b', null, String(S.size));
-    minus.onclick = () => setSize(S.size - 1); plus.onclick = () => setSize(S.size + 1);
-    const fl = el('label'), cb = el('input'); cb.type = 'checkbox'; cb.checked = S.filled; cb.onchange = () => { S.filled = cb.checked; }; fl.append(cb, document.createTextNode('Залить'));
-    const un = el('button', null, '↶'), re = el('button', null, '↷'); un.title = 'Отменить (Ctrl+Z)'; re.title = 'Повторить (Ctrl+Y)';
-    un.onclick = () => swap(S.undo, S.redo); re.onclick = () => swap(S.redo, S.undo);
-    sz.append(document.createTextNode('Размер '), minus, size, plus); top.append(sz, fl, un, re);
-    const file = el('div', 'wzed wzed-file'), fname = el('div', 'wzed-h', '');
-    const mk = (label, fn, cls) => { const b = el('button', cls || null, label); b.onclick = fn; file.appendChild(b); return b; };
-    file.appendChild(fname);
-    mk('Сохранить (Ctrl+S)', () => saveMap(false), 'acc'); mk('Сохранить как…', () => saveMap(true));
-    mk('Мои карты…', openList); mk('Скачать файл .wbx', downloadCurrent);
-    mk('Открыть файл…', () => pickFile((b, n) => loadBytes(b, null)));
-    mk('Скриншот-иконка', () => { S.cur.thumb = thumbNow(); say('Иконка карты обновлена — сохраните карту'); });
-    mk('Чистый лист', () => { if (confirm('Стереть всё над землёй?')) { wipe(); say('Участок очищен'); } });
-    mk('Выйти из редактора', () => exit());
-    file.appendChild(el('div', 'wzed-info', 'Время стоит. ПКМ — двигать камеру, колесо — зум. Ctrl+Z/Y — отмена.'));
-    document.body.append(left, top, file); document.body.classList.add('wzed-on');
-    ui = { left, top, file, tabs, body, size, fileName: fname };
-    renderTools(); renderTabs(); renderFile();
+  let menuEl = null;
+  const toggleMenu = () => {
+    if (menuEl) { menuEl.remove(); menuEl = null; return; }
+    menuEl = el('div', 'wzed wzed-menu panel');
+    const item = (ic, t, fn) => { const b = el('button'); b.type = 'button'; b.innerHTML = icon(ic) + t; b.onclick = () => { toggleMenu(); fn(); }; menuEl.appendChild(b); };
+    item('save', 'Сохранить (Ctrl+S)', () => saveMap(false)); item('save', 'Сохранить как…', () => saveMap(true));
+    item('folder', 'Мои карты…', openList); menuEl.appendChild(el('hr'));
+    item('cam', 'Скриншот-иконка карты', () => { S.cur.thumb = thumbNow(); say('Иконка обновлена — сохраните карту'); });
+    item('down', 'Скачать файл .wbx', downloadCurrent); item('up', 'Открыть файл .wbx…', () => pickFile(b => loadBytes(b, null))); menuEl.appendChild(el('hr'));
+    item('flat', 'Новая плоская карта', () => { if (confirm('Заменить всё плоской землёй? Несохранённое пропадёт.')) { flatten(); say('Плоская карта готова'); } });
+    document.body.appendChild(menuEl);
   };
-  let freezeT = 0;
+  const buildUi = () => {
+    const st = el('style'); st.id = 'wzed-css'; st.textContent = CSS; document.head.appendChild(st);
+    const btn = (cls, html, title, fn) => { const b = el('button', cls); b.type = 'button'; b.title = title || ''; b.innerHTML = html; b.onclick = fn; return b; };
+    const pal = el('div', 'wzed wzed-pal panel'), tabs = el('div', 'wzed-tabs'), body = el('div', 'wzed-body');
+    for (const [k, n] of TABS) { const b = el('button', 'chip', n); b.type = 'button'; b.dataset.tab = k; b.onclick = () => { S.tab = k; renderTabs(); }; tabs.appendChild(b); }
+    const search = el('input'); search.type = 'search'; search.placeholder = 'Поиск предметов…';
+    search.oninput = () => { S.search = search.value; if (['mat', 'bg', 'ppl'].includes(S.tab)) S.tab = 'furniture'; renderTabs(); };
+    pal.append(tabs, search, body);
+    const bar = el('div', 'wzed wzed-bar panel');
+    for (const [k, n, ic] of TOOLS) { const b = btn('tool', icon(ic) + '<span>' + n + '</span>', TIPS[k], () => setTool(k)); b.dataset.tool = k; bar.appendChild(b); }
+    bar.appendChild(el('div', 'sep'));
+    const size = el('b', null, String(S.size)), sz = el('div', 'wzed-size'), row = el('div');
+    row.append(btn('ib', '−', 'Меньше ([)', () => setSize(S.size - 1)), size, btn('ib', '+', 'Больше (])', () => setSize(S.size + 1)));
+    sz.append(row, el('small', null, 'Размер кисти')); bar.appendChild(sz);
+    const fl = btn('tool on', icon('rect') + '<span>Залить</span>', 'Прямоугольник: залитый или контур', () => { S.filled = !S.filled; fl.classList.toggle('on', S.filled); fl.querySelector('span').textContent = S.filled ? 'Залить' : 'Контур'; });
+    bar.appendChild(fl);
+    const top = el('div', 'wzed wzed-top panel'), pause = btn('ib wide', '', '', () => { const g = G(); g.setOL(!g.OL); syncPause(); });
+    const syncPause = () => { const run = !G().OL; pause.innerHTML = run ? icon('pause') + 'Пауза' : icon('play') + 'Снять с паузы'; pause.classList.toggle('on', !run); pause.title = run ? 'Остановить время' : 'Запустить физику, чтобы проверить постройку'; };
+    top.append(pause, btn('ib', icon('undo'), 'Отменить (Ctrl+Z)', () => swap(S.undo, S.redo)), btn('ib', icon('redo'), 'Повторить (Ctrl+Y)', () => swap(S.redo, S.undo)),
+      btn('ib wide', icon('menu') + 'Файл', 'Сохранение и загрузка карт', toggleMenu), btn('ib wide', icon('exit') + 'Выйти', 'Выйти из редактора', () => exit()));
+    const nm = el('div', 'wzed wzed-name panel'), fileName = el('span'); nm.append(el('small', null, 'Редактор карт ·'), fileName);
+    document.body.append(pal, bar, top, nm); document.body.classList.add('wzed-on');
+    ui = { pal, bar, top, tabs, body, size, fileName, syncPause, nm };
+    ui.syncT = setInterval(syncPause, 300); syncPause(); renderTools(); renderTabs(); renderFile();
+  };
+
   const enter = blank => {
     const g = G(); if (!g || !g.gt || !g.ie || !g.Gz) { alert('Редактор недоступен: мод не подключился к этой версии игры.'); return; }
     if (ED.active) return;
-    S.pal = buildPalette(); S.bgs = buildBgs(); S.sel = S.pal[0]; S.tab = 'mat'; S.tool = 'pencil';
-    if (blank) wipe();
-    ED.active = true; buildUi(); g.setOL(true); freezeT = setInterval(() => { try { if (!g.OL) g.setOL(true); } catch (_) {} }, 250);
+    S.pal = buildPalette(); S.bgOf = {}; S.sel = S.pal[0]; S.tab = 'mat'; S.tool = 'pencil'; S.propKey = null;
+    if (blank) flatten();
+    ED.active = true; buildUi(); g.setOL(true); ui.syncPause();
     say('Редактор карт: время остановлено');
   };
   const exit = () => {
     if (!ED.active) return; if (!confirm('Выйти из редактора? Несохранённые изменения останутся только в этой игре.')) return;
-    ED.active = false; clearInterval(freezeT); for (const e of document.querySelectorAll('.wzed')) e.remove();
+    ED.active = false; if (ui) clearInterval(ui.syncT); if (menuEl) { menuEl.remove(); menuEl = null; }
+    for (const e of document.querySelectorAll('.wzed')) e.remove();
     document.body.classList.remove('wzed-on'); try { G().setOL(false); } catch (_) {} ui = null;
   };
-  ED.enter = enter; ED.exit = exit; ED.state = S; ED.wipe = wipe; ED.save = saveMap;
+
+  ED.enter = enter; ED.exit = exit; ED.state = S; ED.flatten = flatten; ED.save = saveMap;
 
   // ------------------------------------------------------------------ main-menu integration -----------------------
   let picked = null;
