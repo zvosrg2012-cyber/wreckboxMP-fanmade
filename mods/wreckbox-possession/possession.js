@@ -712,3 +712,13 @@
   setInterval(renderDebug, 250);
 
 })();
+
+// Map editor lives in its own file next to this one; load it without touching the installer.
+(() => {
+  try {
+    const me = document.currentScript && document.currentScript.src;
+    const s = document.createElement('script');
+    s.src = me ? me.replace(/possession\.js(\?.*)?$/, 'mapeditor.js') : './mods/wreckbox-possession/mapeditor.js';
+    document.head.appendChild(s);
+  } catch (_) {}
+})();
